@@ -102,10 +102,10 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
     });
   }, [items, query, tag, seriesOf]);
 
-  // 图纸库「全部」：照排好的分段摆，一块一行；选了标签或搜索时就是一个平铺的结果
+  // 图纸库「全部」：照排好的顺序连着铺（同一系列挨在一起），不按系列换行，免得行尾留空；选了标签或搜索时就是筛出来的结果
   const blocks = useMemo(() => {
     if (!library || tag !== ALL || query.trim() || !allBlocks) return [list];
-    return allBlocks.filter(b => b.length);
+    return [allBlocks.flat()];
   }, [library, tag, query, list, allBlocks]);
 
   // 大图里翻页的顺序 = 页面上从左到右、从上到下的顺序；首尾相接
