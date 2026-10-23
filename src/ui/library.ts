@@ -8,9 +8,17 @@ import { contentBounds, placeOnBoard, type Grid } from '../core/grid';
 import { isValidCode } from '../core/palette';
 import TAG_GROUPS from './tags.json';
 
-export const TOPIC_TAGS: readonly string[] = TAG_GROUPS['主题'];
+// 标签分三层：大类（每张必有一个，写在第一个，决定它在「全部」里排在哪一段，词表顺序就是显示顺序）、细分、用途
+export const CATEGORY_TAGS: readonly string[] = TAG_GROUPS['大类'];
+export const DETAIL_TAGS: readonly string[] = TAG_GROUPS['细分'];
 export const USE_TAGS: readonly string[] = TAG_GROUPS['用途'];
-const KNOWN_TAGS = new Set([...TOPIC_TAGS, ...USE_TAGS]);
+const KNOWN_TAGS = new Set([...CATEGORY_TAGS, ...DETAIL_TAGS, ...USE_TAGS]);
+
+/** 图纸的大类在词表里排第几（没有大类的排最后） */
+export function categoryRank(tags: readonly string[]): number {
+  const c = tags.find(t => CATEGORY_TAGS.includes(t));
+  return c ? CATEGORY_TAGS.indexOf(c) : CATEGORY_TAGS.length;
+}
 
 export interface LibraryPattern {
   id: string;

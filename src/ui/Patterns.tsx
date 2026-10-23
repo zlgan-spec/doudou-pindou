@@ -1,7 +1,7 @@
 // 图纸库（整理好的现成图纸，public/patterns/index.json）和我的收藏（收藏过的图纸）：顶部导航里各占一个按钮，页面没有页头，打开就是搜索和图纸。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { contentBounds, type Grid } from '../core/grid';
-import { groupSeries, loadLibrary, sizeOf, type Library as LibraryData, type LibraryPattern } from './library';
+import { categoryRank, groupSeries, loadLibrary, sizeOf, type Library as LibraryData, type LibraryPattern } from './library';
 import { Mine } from './Mine';
 import { NoteToast } from './NoteToast';
 import { downloadSheet, PatternBrowser, type BrowserItem, type SeriesGroup } from './PatternBrowser';
@@ -45,11 +45,30 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
     ) : undefined,
   })), [patterns]);
 
-  // 成套的图纸按系列放在一起，系列里按加入顺序
-  const series = useMemo((): SeriesGroup[] => {
-    if (!lib) return [];
+  // 「全部」的摆法（用户先按喜好找大类，再看一套套的系列）：
+  // 1. 按大类分段，顺序照 tags.json「大类」；系列的大类看它第一张的第一个大类标签
+  // 2. 同一大类里，系列在前：最近加入的系列在前，同一天的按 index.json 系列清单的先后
+  // 3. 不成系列的单张放这一类最后，新的在前；系列里面照系列自己的顺序
+  const { series, blocks } = useMemo((): { series: SeriesGroup[]; blocks: BrowserItem[][] } => {
+    if (!lib) return { series: [], blocks: [] };
     const byId = new Map(items.map(i => [i.id, i]));
-    return groupSeries(lib).groups.map(({ series: s, patterns: ps }) => ({ id: s.id, name: s.name, items: ps.map(p => byId.get(p.id)!) }));
+    const latest = (ps: LibraryPattern[]) => ps.reduce((m, p) => (p.addedAt > m ? p.addedAt : m), '');
+    const { groups, singles } = groupSeries(lib);
+    const ordered = groups
+      .map((g, order) => ({ ...g, rank: categoryRank(g.patterns[0].tags), date: latest(g.patterns), order }))
+      .sort((a, b) => a.rank - b.rank || b.date.localeCompare(a.date) || a.order - b.order);
+    const seriesGroups = ordered.map(({ series: s, patterns: ps }) => ({ id: s.id, name: s.name, items: ps.map(p => byId.get(p.id)!), rank: categoryRank(ps[0].tags) }));
+    const singleBlocks = new Map<number, LibraryPattern[]>();
+    for (const p of singles) {
+      const r = categoryRank(p.tags);
+      singleBlocks.set(r, [...(singleBlocks.get(r) ?? []), p]);
+    }
+    const ranks = [...new Set([...seriesGroups.map(g => g.rank), ...singleBlocks.keys()])].sort((a, b) => a - b);
+    const all = ranks.flatMap(r => [
+      ...seriesGroups.filter(g => g.rank === r).map(g => g.items),
+      ...(singleBlocks.has(r) ? [[...singleBlocks.get(r)!].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).map(p => byId.get(p.id)!)] : []),
+    ]);
+    return { series: seriesGroups, blocks: all };
   }, [lib, items]);
 
   if (!patterns) return <p className="status busy">正在读取图纸库…</p>;
@@ -74,6 +93,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
       <PatternBrowser
         items={items}
         series={series}
+        blocks={blocks}
         actions={(item, close) => {
           const p = patterns.find(x => x.id === item.id);
           if (!p) return null;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { SIZES, boardLabel, type SizeId, type StyleId } from '../core/config';
 import { beadCount, legendOf, type Grid } from '../core/grid';
 import { renderSheet, sheetLayout } from '../render/sheet';
-import { sizeOf, TOPIC_TAGS, USE_TAGS } from './library';
+import { CATEGORY_TAGS, DETAIL_TAGS, sizeOf, USE_TAGS } from './library';
 import { embedPattern, sheetFileName } from './pngData';
 
 export interface BrowserItem {
@@ -24,6 +24,8 @@ interface Props {
   actions: (item: BrowserItem, close: () => void) => ReactNode;
   /** 图纸库才有：「全部」里按系列摆，点进去看整套（我的收藏不分组） */
   series?: SeriesGroup[];
+  /** 图纸库「全部」的摆法：按大类分段，每段系列在前、单张在后，一块一行（排好的顺序，见 Patterns.tsx） */
+  blocks?: BrowserItem[][];
 }
 
 const ALL = '全部';
@@ -73,7 +75,7 @@ function Card({ item, i, bare, onOpen }: { item: BrowserItem; i: number; bare: b
   );
 }
 
-export function PatternBrowser({ items, actions, series = [] }: Props) {
+export function PatternBrowser({ items, actions, series = [], blocks: allBlocks }: Props) {
   const library = series.length > 0;
   const [query, setQuery] = useState('');
   // 图纸库：选系列或豆板；我的收藏：选标签。旧的系列网址打开时直接选中那个系列
@@ -82,11 +84,12 @@ export function PatternBrowser({ items, actions, series = [] }: Props) {
   const active = items.find(i => i.id === activeId) ?? null;
   const seriesOf = useMemo(() => new Map(series.flatMap(s => s.items.map(i => [i.id, s.name] as const))), [series]);
 
-  // 一排按钮：图纸库是 全部 → 各系列 → 豆板；我的收藏是 全部 → 豆板 → 主题 → 用途。只列有图纸的
+  // 一排按钮：全部 → 尺寸 → 大类 → 细分 → 用途，图纸库最后再接各系列（和「全部」里的先后一样）。只列有图纸的
   const chips = useMemo(() => {
     const sizes = Object.values(SIZES).map(s => s.label);
     const count = (t: string) => items.filter(i => seriesOf.get(i.id) === t || i.tags.includes(t) || sizeLabel(i.grid) === t).length;
-    const names = library ? [...series.map(s => s.name), ...sizes] : [...sizes, ...TOPIC_TAGS, ...USE_TAGS];
+    // 系列名和标签同名（如「风景」「货币」）只留一个按钮：选它时标签和系列里的图纸都会列出来
+    const names = [...new Set([...sizes, ...CATEGORY_TAGS, ...DETAIL_TAGS, ...USE_TAGS, ...(library ? series.map(s => s.name) : [])])];
     return [{ name: ALL, n: items.length }, ...names.map(name => ({ name, n: count(name) })).filter(c => c.n > 0)];
   }, [items, series, seriesOf, library]);
 
@@ -99,12 +102,11 @@ export function PatternBrowser({ items, actions, series = [] }: Props) {
     });
   }, [items, query, tag, seriesOf]);
 
-  // 图纸库「全部」：同一个系列的放在一起、按加入顺序，每个系列另起一行；不在系列里的单张放最后
+  // 图纸库「全部」：照排好的分段摆，一块一行；选了标签或搜索时就是一个平铺的结果
   const blocks = useMemo(() => {
-    if (!library || tag !== ALL || query.trim()) return [list];
-    const grouped = new Set(series.flatMap(s => s.items.map(i => i.id)));
-    return [...series.map(s => s.items), items.filter(i => !grouped.has(i.id))].filter(b => b.length);
-  }, [library, tag, query, list, series, items]);
+    if (!library || tag !== ALL || query.trim() || !allBlocks) return [list];
+    return allBlocks.filter(b => b.length);
+  }, [library, tag, query, list, allBlocks]);
 
   // 大图里翻页的顺序 = 页面上从左到右、从上到下的顺序；首尾相接
   const order = useMemo(() => blocks.flat(), [blocks]);
@@ -383,7 +385,7 @@ function Viewer({ item, actions, onClose, onStep }: { item: BrowserItem; actions
           </button>
         </div>
         {(item.tags.length > 0 || size) && (
-          <p className="viewer-tags">{[...item.tags, ...(size ? [size] : [])].map(t => <span key={t}>{t}</span>)}</p>
+          <p className="viewer-tags">{[...(size ? [size] : []), ...item.tags].map(t => <span key={t}>{t}</span>)}</p>
         )}
         <dl className="viewer-facts">
           <div><dt>豆板</dt><dd>{boardLabel(item.grid.width, item.grid.height)}</dd></div>
