@@ -39,6 +39,8 @@ export interface SheetOptions {
   scale?: number;
   /** 图纸名字：表头写「DouDou / 名字」，没起名只写「DouDou」（和网站顶栏同一个写法，作者另在图纸库里写） */
   title?: string;
+  /** 只画图纸的这一块（版式坐标）：大图放大后只画看得见的部分，画布不会超出浏览器的像素上限 */
+  region?: { x: number; y: number; w: number; h: number };
 }
 
 export interface SheetLayout {
@@ -107,19 +109,24 @@ function lineKind(i: number, n: number): 'border' | 'seam' | 'major' | 'thin' {
 export function renderSheet(grid: Grid, options: SheetOptions = {}, canvas: HTMLCanvasElement = document.createElement('canvas')): HTMLCanvasElement {
   const L = sheetLayout(grid);
   const scale = options.scale ?? 1;
-  canvas.width = Math.max(1, Math.round(L.width * scale));
-  canvas.height = Math.max(1, Math.round(L.height * scale));
+  const R = options.region ?? { x: 0, y: 0, w: L.width, h: L.height };
+  canvas.width = Math.max(1, Math.round(R.w * scale));
+  canvas.height = Math.max(1, Math.round(R.h * scale));
   const ctx = canvas.getContext('2d')!;
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, -R.x * scale, -R.y * scale);
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, L.width, L.height);
+  ctx.fillRect(R.x, R.y, R.w, R.h);
 
   const legend = legendOf(grid);
   drawHeader(ctx, L, grid, legend, options);
-  const all: number[] = [];
-  for (let i = 0; i < grid.cells.length; i++) if (grid.cells[i]) all.push(i);
-  drawCells(ctx, L, grid, all, options);
+  // 只画落在这一块里的格子
+  const { cell, gridX, gridY } = L;
+  const x0 = Math.max(0, Math.floor((R.x - gridX) / cell)), x1 = Math.min(grid.width - 1, Math.floor((R.x + R.w - gridX) / cell));
+  const y0 = Math.max(0, Math.floor((R.y - gridY) / cell)), y1 = Math.min(grid.height - 1, Math.floor((R.y + R.h - gridY) / cell));
+  const cells: number[] = [];
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (grid.cells[y * grid.width + x]) cells.push(y * grid.width + x);
+  drawCells(ctx, L, grid, cells, options);
   drawAxes(ctx, L, grid);
   drawGridLines(ctx, L, grid, options);
   drawLegend(ctx, L, legend);
@@ -134,7 +141,8 @@ export function renderSheetDiff(prev: Grid, grid: Grid, options: SheetOptions, c
   if (prev.width !== grid.width || prev.height !== grid.height) return false;
   const L = sheetLayout(grid), P = sheetLayout(prev);
   const scale = options.scale ?? 1;
-  if (L.height !== P.height || canvas.width !== Math.max(1, Math.round(L.width * scale)) || canvas.height !== Math.max(1, Math.round(L.height * scale))) return false;
+  const R = options.region ?? { x: 0, y: 0, w: L.width, h: L.height };
+  if (L.height !== P.height || canvas.width !== Math.max(1, Math.round(R.w * scale)) || canvas.height !== Math.max(1, Math.round(R.h * scale))) return false;
   const { width: w, height: h } = grid;
   const dirty = new Set<number>(extra);
   for (let i = 0; i < grid.cells.length; i++) if (grid.cells[i] !== prev.cells[i]) dirty.add(i);
@@ -150,7 +158,7 @@ export function renderSheetDiff(prev: Grid, grid: Grid, options: SheetOptions, c
     }
   }
   const ctx = canvas.getContext('2d')!;
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, -R.x * scale, -R.y * scale);
   ctx.imageSmoothingEnabled = false;
   const list = [...cells];
   // 只在这些格子里画：格子边上的线有一半在旁边没重画的格子里，画两遍会变深

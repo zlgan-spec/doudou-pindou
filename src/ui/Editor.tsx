@@ -176,6 +176,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const doc = history.present;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const detailRef = useRef<HTMLCanvasElement>(null); // 大图放大后叠在上面的清晰画布，只画看得见的那一块
   // 网格视图：全部 → 只留每 10 格粗线 → 不显示 → 全部，只改屏幕上的看法，导出照常带完整网格
   // 第四种「预览」：网格和色号都不显示，看整体效果
   const [gridView, setGridView] = useState<'all' | 'major' | 'none' | 'preview'>('all');
@@ -274,11 +275,12 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   }, [measureFit]);
 
   // 清晰度：画布按「屏幕上显示的大小 × 屏幕清晰度」画，放大后也是锐利的。
-  // 画布像素有上限（太大浏览器会卡或画不出来），所以最大放大倍数也限制在还能画清楚的范围
+  // 整张画布的像素有上限（太大浏览器会卡或画不出来）：大图放大到整张画不清楚时，另叠一块只画看得见那部分的清晰画布，
+  // 所以任何尺寸都能放大到一颗豆 64 像素
   const PIXEL_BUDGET = 40e6;
   const dpr = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 3);
   const maxScale = Math.sqrt(PIXEL_BUDGET / (natural.width * natural.height));
-  const maxZoom = fit ? Math.max(1, Math.min(2 / fit.scale, maxScale / (dpr * fit.scale))) : 1;
+  const maxZoom = fit ? Math.max(1, 2 / fit.scale) : 1;
   // null = 还没量出窗口大小：先不画，量好后直接按合适的清晰度画一次（不先按原尺寸画一遍大图）
   const [renderScale, setRenderScale] = useState<number | null>(null);
   useEffect(() => {
@@ -389,6 +391,49 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   }, []);
   const sheetStyle = fit ? { width: fit.w * zoom, height: fit.h * zoom } : undefined;
 
+  // 清晰画布画的是哪一块（版式坐标）：看得见的范围四周多留 30%，滚动、缩放时超出了才换一块重画
+  const [detail, setDetail] = useState<{ x: number; y: number; w: number; h: number; zoom: number } | null>(null);
+  const updateDetail = useCallback(() => {
+    const view = viewRef.current, canvas = canvasRef.current, z = zoomRef.current;
+    if (!fit || !view || !canvas || fit.scale * z * dpr <= maxScale * 1.02) return setDetail(null);
+    const c = canvas.getBoundingClientRect(), v = view.getBoundingClientRect();
+    const k = c.width / natural.width;
+    if (!k) return;
+    const vx0 = (Math.max(v.left, c.left) - c.left) / k, vx1 = (Math.min(v.right, c.right) - c.left) / k;
+    const vy0 = (Math.max(v.top, c.top) - c.top) / k, vy1 = (Math.min(v.bottom, c.bottom) - c.top) / k;
+    if (vx1 <= vx0 || vy1 <= vy0) return;
+    setDetail(d => {
+      if (d && d.zoom === z && d.x <= vx0 && d.y <= vy0 && d.x + d.w >= vx1 && d.y + d.h >= vy1) return d;
+      const mx = (vx1 - vx0) * 0.3, my = (vy1 - vy0) * 0.3;
+      const x = Math.max(0, vx0 - mx), y = Math.max(0, vy0 - my);
+      return { x, y, w: Math.min(natural.width, vx1 + mx) - x, h: Math.min(natural.height, vy1 + my) - y, zoom: z };
+    });
+  }, [fit, natural, dpr, maxScale]);
+  useEffect(() => {
+    const id = requestAnimationFrame(updateDetail);
+    return () => cancelAnimationFrame(id);
+  }, [zoom, updateDetail]);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(updateDetail);
+    };
+    view.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      view.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [updateDetail]);
+  const detailK = fit ? fit.scale * zoom : 0; // 屏幕上一个版式单位多宽
+  const detailStyle = detail && detail.zoom === zoom
+    ? { left: detail.x * detailK, top: detail.y * detailK, width: detail.w * detailK, height: detail.h * detailK }
+    : { display: 'none' };
+
   // 全屏：图纸区铺满屏幕、整张放进来；再点一次或按 Esc 退出。浏览器不支持真全屏时就铺满窗口
   const [full, setFull] = useState(false);
   const enterFull = () => {
@@ -472,18 +517,26 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   // 表格一变、看法一变、缩放停下来，就按当前需要的清晰度重画图纸。
   // 只是改了几颗豆（看法没变）：只重画改过的格子和实时预览涂过的格子，大图不用整张重画
   const drawn = useRef<{ grid: Grid; key: unknown[] } | null>(null);
+  const detailDrawn = useRef<{ grid: Grid; key: unknown[] } | null>(null);
   const liveCells = useRef(new Set<number>());
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || renderScale === null) return;
     const options = { mirrored: doc.mirrored, dim, lines: gridLines, codes: showCodes, scale: renderScale, title: name };
     const key = [doc.mirrored, dim, gridLines, showCodes, renderScale, name, logoTick];
-    const prev = drawn.current;
-    const same = prev && prev.key.every((v, i) => v === key[i]);
-    if (!same || !renderSheetDiff(prev.grid, doc.grid, options, canvas, liveCells.current)) renderSheet(doc.grid, options, canvas);
+    const draw = (target: HTMLCanvasElement, opts: typeof options & { region?: NonNullable<typeof detail> }, k: unknown[], memo: typeof drawn) => {
+      const prev = memo.current;
+      const same = prev && prev.key.length === k.length && prev.key.every((v, i) => v === k[i]);
+      if (!same || !renderSheetDiff(prev.grid, doc.grid, opts, target, liveCells.current)) renderSheet(doc.grid, opts, target);
+      memo.current = { grid: doc.grid, key: k };
+    };
+    draw(canvas, options, key, drawn);
+    // 清晰画布：只画看得见的那一块，按放大后的清晰度
+    const dc = detailRef.current;
+    if (dc && detail && fit) draw(dc, { ...options, scale: fit.scale * detail.zoom * dpr, region: detail }, [...key, detail], detailDrawn);
+    else detailDrawn.current = null;
     liveCells.current.clear();
-    drawn.current = { grid: doc.grid, key };
-  }, [doc, dim, gridLines, showCodes, logoTick, renderScale, name]);
+  }, [doc, dim, gridLines, showCodes, logoTick, renderScale, name, detail, fit, dpr]);
   useEffect(redraw, [redraw]);
   const redrawRef = useRef(redraw);
   redrawRef.current = redraw;
@@ -514,20 +567,23 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
 
   const paintLive = (x: number, y: number, code: string | null) => {
     if (x < 0 || y < 0 || x >= doc.grid.width || y >= doc.grid.height) return; // 画到板外的先不预览，松手后豆板扩大再画上
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext('2d')!;
     const L = sheetLayout(doc.grid);
     const px = L.gridX + x * L.cell, py = L.gridY + y * L.cell;
     liveCells.current.add(y * doc.grid.width + x);
-    ctx.fillStyle = code ? colorOf(code).hex : '#ffffff';
-    if (gridLines === 'all') ctx.fillRect(px + 2, py + 2, L.cell - 3, L.cell - 3); // 留出网格线，实时预览不盖住线
-    else ctx.fillRect(px, py, L.cell, L.cell);
-    if (code && showCodes) {
-      ctx.fillStyle = textColorOn(colorOf(code).hex);
-      ctx.font = `bold ${Math.round(L.cell * 0.34)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(code, px + L.cell / 2, py + L.cell / 2 + 1);
+    // 两块画布都画（清晰画布开着时盖在上面）；画布上一次画图纸时设好的缩放和位移还在，直接按版式坐标画
+    for (const canvas of [canvasRef.current, detail ? detailRef.current : null]) {
+      if (!canvas) continue;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = code ? colorOf(code).hex : '#ffffff';
+      if (gridLines === 'all') ctx.fillRect(px + 2, py + 2, L.cell - 3, L.cell - 3); // 留出网格线，实时预览不盖住线
+      else ctx.fillRect(px, py, L.cell, L.cell);
+      if (code && showCodes) {
+        ctx.fillStyle = textColorOn(colorOf(code).hex);
+        ctx.font = `bold ${Math.round(L.cell * 0.34)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(code, px + L.cell / 2, py + L.cell / 2 + 1);
+      }
     }
   };
 
@@ -1439,6 +1495,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         <div className="sheet-pad" style={zoom > 1 && fit ? { padding: `${fit.padY}px ${fit.padX}px` } : undefined}>
         <div className="sheet-wrap" style={sheetStyle}>
           <canvas ref={canvasRef} className={`sheet ${editing ? 'editing' : ''} ${penMode ? 'pen-mode' : ''}`} style={sheetStyle} aria-label="拼豆图纸" />
+          <canvas ref={detailRef} className="sheet-detail" style={detailStyle} aria-hidden />
           <canvas ref={overlayRef} className={`sheet-overlay ${editing ? '' : 'hidden'}`} />
           {tool === 'select' && float && !selDragging && fit && (() => {
             const k = (fit.w * zoom) / natural.width;

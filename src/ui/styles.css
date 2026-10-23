@@ -334,6 +334,7 @@ a { color: inherit; }
 .ref-size { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.35) 50%, rgba(0, 0, 0, 0.35) 60%, transparent 60%, transparent 72%, rgba(0, 0, 0, 0.35) 72%, rgba(0, 0, 0, 0.35) 82%, transparent 82%); }
 .ref-win.min { display: flex; align-items: center; padding: 2px 2px 2px 4px; border-radius: 999px; }
 .ref-win.min button:first-child { width: auto; padding: 0 10px; font-size: 12px; font-weight: 500; color: var(--ink); }
+.sheet-detail { position: absolute; pointer-events: none; } /* 大图放大后只画看得见那块的清晰画布 */
 .sheet-overlay { z-index: 1; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 /* 鼠标跟着工具变形状（像 Figma / Aseprite）：和工具栏同一套图标，热点在笔尖 / 吸管尖 / 颜料滴上。
    画笔能画到图纸外的灰色区域，所以整个看图区都是画笔；其他工具只在图纸上变 */
