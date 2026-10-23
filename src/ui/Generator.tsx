@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import { MAX_CUSTOM_SIDE, SIZES, boardFor, tierFor, type SizeId, type StyleId } from '../core/config';
 import { startHistory, type History } from '../core/edit';
 import { beadCount, contentBounds, legendOf, type Grid } from '../core/grid';
-import { PALETTE } from '../core/palette';
 import type { Mask } from '../core/image';
 import type { Reference } from './Editor';
 import type { RgbaImage } from '../core/image';
@@ -185,7 +184,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     if (!last || richFor.current === genId) return;
     richFor.current = genId;
     const at = genId;
-    void generateInBackground(last.input, { ...last.options, maxColors: Math.min(PALETTE.length, baseColors * 3) }).then(grid => setRich({ genId: at, grid }));
+    void generateInBackground(last.input, last.options, true).then(grid => setRich({ genId: at, grid }));
   };
 
   const generate = useCallback(async (src: Source, sz: Sizing, styleId: StyleId, bg: boolean): Promise<void> => {

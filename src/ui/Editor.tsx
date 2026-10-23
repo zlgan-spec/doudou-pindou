@@ -3,7 +3,7 @@
 import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement, type ReactNode } from 'react';
 import { textColorOn } from '../core/color';
-import { SIZES, boardFor, boardTiles, type SizeId, type StyleId } from '../core/config';
+import { MAX_COLORS, SIZES, boardFor, boardTiles, type SizeId, type StyleId } from '../core/config';
 import { commit, copySpot, denoise, fillRect, fitOnBoard, fillRegion, growToFit, mirrorGrid, mirrorRect, outlineGrid, paintCells, redo, reduceColors, replaceColor, undo, type History, type Rect } from '../core/edit';
 import { legendOf, type Grid } from '../core/grid';
 import { colorOf } from '../core/palette';
@@ -1114,7 +1114,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const richN = useMemo(() => (colorRange?.rich ? legendOf(colorRange.rich).length : 0), [colorRange?.rich]);
   const base = Math.max(2, colorRange?.base ?? cur);
   // 多色版还在后台算（大图要一秒左右）：先按两倍算右半，滑块照样停在正中，算好再换成真的上限
-  const top = Math.max(base, cur, colorRange ? (colorRange.rich ? richN : base * 2 - 2) : 0);
+  const top = Math.max(base, cur, colorRange ? (colorRange.rich ? richN : Math.min(MAX_COLORS, base * 2 - 2)) : 0);
   const twoSided = top > base;
   // 滑块位置 0–100 ↔ 色数：两边都能调时左右各占一半，刚生成的色数在 50
   const toN = (p: number) => Math.round(!twoSided ? 2 + ((top - 2) * p) / 100 : p <= 50 ? 2 + ((base - 2) * p) / 50 : base + ((top - base) * (p - 50)) / 50);

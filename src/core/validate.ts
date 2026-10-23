@@ -1,6 +1,6 @@
 // 图纸自动检查：图纸交付标准里能用程序判断的条目（A1、B1… 是条目编号）。
 // 版式类（C2、C3、C7、C8）由渲染器按固定规则画出，在渲染测试里检查。
-import { MAX_ISLAND, MIN_BEADS_PER_COLOR, SAFE_MARGIN, SIZES, type SizeId, type StyleId } from './config';
+import { MAX_COLORS, MAX_ISLAND, MIN_BEADS_PER_COLOR, SAFE_MARGIN, SIZES, type SizeId, type StyleId } from './config';
 import { connectedRegions, contentBounds, getCell, legendOf, type Grid } from './grid';
 import { colorOf, isValidCode } from './palette';
 import { labDistance } from './color';
@@ -41,8 +41,7 @@ export function validateGrid(grid: Grid, options: ValidateOptions): CheckResult[
   check('B1/B2', invalid.length === 0, invalid.length ? `非法色号：${[...new Set(invalid)].join('、')}` : '全部是合法 MARD 色号或空格');
 
   const legend = legendOf(grid);
-  const maxColors = options.style === 'realistic' ? size.realisticMaxColors : size.autoMaxColors;
-  check('B4', legend.length <= maxColors, `${legend.length} 色，上限 ${maxColors}`);
+  check('B4', legend.length <= MAX_COLORS, `${legend.length} 色，上限 ${MAX_COLORS}`);
 
   if (!options.edited) {
     const rare = legend.filter(l => l.count < MIN_BEADS_PER_COLOR);

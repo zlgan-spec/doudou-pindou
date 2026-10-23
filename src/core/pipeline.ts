@@ -4,8 +4,8 @@ import { regularizeEdges, tidyEdges } from './contour';
 import { classifyInput, hasOwnOutline, type InputKind } from './classify';
 import { capColors, mergeNearDuplicates, mergeRareColors, mergeSmallRegions, protectDetails, removeIslands, detailColors } from './cleanup';
 import { chroma, labDistance, rgbToLab, type Lab } from './color';
-import { MIN_BEADS_PER_COLOR, SIZES, STYLES, boardArea, fitSide, type SizeId, type StyleId } from './config';
-import { connectedRegions, createGrid, type Grid } from './grid';
+import { MAX_COLORS, MIN_BEADS_PER_COLOR, SIZES, STYLES, boardArea, fitSide, type SizeId, type StyleId } from './config';
+import { connectedRegions, createGrid, legendOf, type Grid } from './grid';
 import type { Mask, RgbaImage } from './image';
 import { addOutline, type OpenSides } from './outline';
 import { colorOf, matchDistance } from './palette';
@@ -19,6 +19,8 @@ export interface PatternOptions {
   maxColors?: number;
   /** 自定义尺寸：图案按比例放进 w×h 颗以内（不留边），再放到能装下它的豆板上；超过 104 用几块 104 板拼。size 只管色数和清理力度 */
   fit?: { w: number; h: number };
+  /** 平涂图的聚类半径，不给就按豆板定（generateRich 用来试不同档） */
+  clusterRadius?: number;
 }
 
 export interface PatternInput {
@@ -478,7 +480,7 @@ function generateFromPixelArt(input: PatternInput, options: PatternOptions): Gri
   }
   let out = mergeNearDuplicates(codes, 0.035); // 只合并 JPEG 噪点级别的差异
   out = mergeRareColors(out, MIN_BEADS_PER_COLOR);
-  out = capColors(out, options.maxColors ?? size.autoMaxColors);
+  out = capColors(out, options.maxColors ?? MAX_COLORS); // 像素画一格一豆还原，颜色按作者画的来，不按豆板砍
   return placeOnBoard(out, gw, gh, options.fit ? undefined : size.board);
 }
 
@@ -498,11 +500,13 @@ function generateFromFlat(input: PatternInput, options: PatternOptions): Grid {
   const { gw, gh } = work;
   const subject = work.sub.filter((_, i) => work.subMask[i]);
   const step = Math.max(1, Math.floor(subject.length / 20000));
-  const clusterCode = clusterColors(subject.filter((_, i) => i % step === 0), FLAT_CLUSTER_RADIUS);
+  const sample = subject.filter((_, i) => i % step === 0);
+  const radius = flatRadius(options);
+  const clusterCode = clusterColors(sample, radius);
   const subCodes = work.sub.map((lab, i) => (work.subMask[i] ? clusterCode(lab) : null));
 
   let codes = voteCells(work, subCodes);
-  codes = mergeNearDuplicates(codes, 0.05);
+  codes = mergeNearDuplicates(codes, Math.min(0.05, radius * 0.85));
   const keep = protectDetails(codes, gw, gh);
   const details = detailColors(codes, keep); // 眼睛、高光的颜色：后面砍色数时不动
   codes = mergeSmallRegions(codes, gw, gh, 2, keep); // 只清 1 颗的压缩噪点；2 颗以上视为作者有意
@@ -518,11 +522,37 @@ function generateFromFlat(input: PatternInput, options: PatternOptions): Grid {
     const outlined = addOutline(codes, gw, gh, style.outline === 'black' ? 'black' : 'dark', openSides(input.mask, input.image.width, input.image.height));
     [codes, w, h] = [outlined.codes, outlined.w, outlined.h];
   }
-  codes = capColors(codes, options.maxColors ?? size.autoMaxColors, details);
+  codes = capColors(codes, options.maxColors ?? MAX_COLORS, details);
   return placeOnBoard(codes, w, h, options.fit ? undefined : size.board);
 }
 
-const FLAT_CLUSTER_RADIUS = 0.06; // 同一块平涂色的离散范围；底色和阴影色通常差 0.08 以上，不会被并掉
+// 平涂图的聚类半径：同一块平涂色的离散范围（底色和阴影色通常差 0.08 以上，不会被并掉）。
+// 板越大能放下越多明暗细节，颜色分得越细，默认色数跟着板变多
+const FLAT_RADIUS: Record<SizeId, number> = { small: 0.06, medium: 0.045, large: 0.035 };
+const FLAT_RADIUS_BEYOND = 0.03; // 超过一块 104 板的大图
+const FLAT_RADIUS_STEPS = [0.05, 0.042, 0.035, 0.028, 0.022, 0.017]; // 多色版要试的几档；再细就碎成一颗一颗，清理时又并回去，颜色反而少
+function flatRadius(options: PatternOptions): number {
+  if (options.clusterRadius) return options.clusterRadius;
+  return options.fit && Math.max(options.fit.w, options.fit.h) > SIZES.large.board ? FLAT_RADIUS_BEYOND : FLAT_RADIUS[options.size];
+}
+
+/**
+ * 「颜色数量」往右用的多色版：同一张图尽量多分出颜色，最多 MAX_COLORS。
+ * 平涂图聚类半径越小不一定颜色越多（太碎会被清理并回去），所以几档各出一次，取颜色最多的那张
+ */
+export function generateRich(input: PatternInput, options: PatternOptions): Grid {
+  const kind = resolveKind(input);
+  const opts = { ...options, maxColors: MAX_COLORS };
+  if (kind !== 'flat') return generatePattern({ ...input, kind }, opts);
+  const start = flatRadius(options);
+  let best: Grid | null = null, most = -1;
+  for (const r of [start, ...FLAT_RADIUS_STEPS.filter(r => r < start)]) {
+    const g = generateFromFlat({ ...input, kind }, { ...opts, clusterRadius: r });
+    const n = legendOf(g).length;
+    if (n > most) [best, most] = [g, n];
+  }
+  return best!;
+}
 
 export function generatePattern(input: PatternInput, options: PatternOptions): Grid {
   const kind = resolveKind(input);

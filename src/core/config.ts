@@ -22,6 +22,8 @@ export const SIZES: Record<SizeId, SizeSpec> = {
 };
 
 export const SAFE_MARGIN = 1;
+/** 颜色数量最多到这里：同类工具一般给到 64 色，再多买豆、拼都太麻烦 */
+export const MAX_COLORS = 64;
 export const BEAD_MM = 2.6;
 export const MIN_BEADS_PER_COLOR = 3;
 export const MAX_ISLAND = 3;

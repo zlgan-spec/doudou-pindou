@@ -1,6 +1,6 @@
 // 出图入口：交给后台线程算，页面不卡；后台线程起不来时退回在页面里算
 import type { Grid } from '../core/grid';
-import { generatePattern, type PatternInput, type PatternOptions } from '../core/pipeline';
+import { generatePattern, generateRich, type PatternInput, type PatternOptions } from '../core/pipeline';
 
 let worker: Worker | null = null;
 let broken = false;
@@ -16,9 +16,11 @@ export function warmUp(): void {
   }
 }
 
-export function generateInBackground(input: PatternInput, options: PatternOptions): Promise<Grid> {
+/** rich：算「颜色数量」往右用的多色版（generateRich） */
+export function generateInBackground(input: PatternInput, options: PatternOptions, rich = false): Promise<Grid> {
   warmUp();
-  if (broken || !worker) return Promise.resolve().then(() => generatePattern(input, options));
+  const run = () => (rich ? generateRich : generatePattern)(input, options);
+  if (broken || !worker) return Promise.resolve().then(run);
   const w = worker;
   const id = ++nextId;
   return new Promise((resolve, reject) => {
@@ -35,10 +37,10 @@ export function generateInBackground(input: PatternInput, options: PatternOption
     const onError = () => {
       done();
       broken = true;
-      resolve(generatePattern(input, options));
+      resolve(run());
     };
     w.addEventListener('message', onMessage);
     w.addEventListener('error', onError);
-    w.postMessage({ id, input, options });
+    w.postMessage({ id, input, options, rich });
   });
 }
