@@ -2,13 +2,6 @@
   "v": 1,
   "series": [
     {
-      "id": "doudou-original",
-      "name": "DouDou 原创",
-      "note": "DouDou · AI 原创",
-      "cover": "panda-nap",
-      "featured": true
-    },
-    {
       "id": "detective-conan",
       "name": "名侦探柯南",
       "note": "DouDou · AI 原创",
@@ -210,8 +203,7 @@
         ".eeffeeeeeeeccccc000cccccccceeeeeeeeeeeeeeeeeeeee7eeeeeeeeeeebb4444444i444eeeeeeecccciiiiiiffffiii",
         ".ee66eeeeeecc00cc77777cccccccceeeeeeeeeeeeeeeeeee7eeeeeeeeeeeeeee4444ii444eeeeeeecccciiiiii77777..",
         "...66eeeccccc00cc77777cceecccceeeeccceeeeeeeeeeee77eeeeeeeeeeeeeeeeeeeee4444eeeeecceeiiiiii77777.."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "tomato-bunny",
@@ -342,8 +334,7 @@
         ".7000666666666604444444000044440000444444444444444447777777777777777774444444044444444444400444.",
         "..740666666666604444444000444440000444444444444444447777777777777777771444444444444444004400044.",
         "...446666666666000044400664444400004444444444444444477777777777777777114444444444444440004000..."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "black-kitten",
@@ -469,8 +460,7 @@
         "1111116666666666666bbbb666611111166666666000000006666600000000000000000000000000",
         "116666666666666666bbbbb666666666666666600000000000000000000000000000000000000000",
         ".6666666666600000bbbbbb66666666666666600000000000000000000000000000000000000000."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "red-hair-girl",
@@ -603,8 +593,7 @@
         "999bbbbbbbooooooooo2222444444444oobbbbbbbbdddddddeedd7777799h777777777777777772222cccccbb777777777",
         ".999bbbbbbbboooooo8222244c444444ooobbbbbbbbb66ddddddd67777llh777777777777777444444cc4224777777777.",
         "..9999bbbbbboooooo8222244cc44444ooobbbbbbbbb66dddddddd7777lll77777777777777744444444422c77777777.."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "black-hair-girl",
@@ -724,8 +713,7 @@
         "00000000000000000000011222222222222222211000000000000000000000001144444411000000000000000000000000",
         "00000000000000000000011122222222222222211100000000000000000000001144444411100000000000000000000000",
         ".000000000000000000000112222222222222222110000000000000000000001114444441110000000000000000000000."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "green-wonderland",
@@ -879,8 +867,7 @@
         "aDDDDDDt0009999009999000DDDD0sssssDDss988555555xxyyyy559999999999BBBBDDDDDDD5DDDDDDgaaaagg9999",
         ".DDDDDDt0009999009999000qqDD0q88888888d88555555xx5555599999999999999DDDDDDDaaaaaaaaaaaaaggaaa.",
         "..DDDDDss009999909999000qqDDqq88888888dd555ccc55555555999999999909999DDDDDDaaaaaaaaaaa999999.."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "ink-girl",
@@ -1025,8 +1012,7 @@
         ".00000000000000000000000000000702vvvbbe22222200066669966690000022220eeeebb0vvv00022.",
         "..0000000000000000000000000000722vvvveee222jj0006666966666000000220eeeeebb066n000...",
         "....00000000000000000000000000022vvvveee220jj000666696666600000022eeeeeebb066nnn...."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "ink-portrait",
@@ -1113,8 +1099,7 @@
         ".000000000000000000000000000000000000000000000005255220000000000000000001120002257777555554400000.",
         "..0000000000000000000000000000000000000000000001125522000000000000000000000000222577755555555000..",
         "...00000000000000000000000000000000000000000221722552200000000000000044400000022225555555555500..."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "guofeng-01",
@@ -1247,8 +1232,7 @@
         "aaaaaaaaaaaaaaaaaaaaaaaaaaa555eeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiieeeeeeeeeeeea",
         "aaaaaaaaaaaaaaaaaaaaaaaaaa5555eeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiieeeeeeeeeea",
         ".aaaaaaaaaaaaaaaaaaaaaaaaa555iieeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiieeeeeeeeee."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "guofeng-02",
@@ -1388,8 +1372,7 @@
         "9999mm9mmmm99m999mmmmmmmm999999000999999980000000000000000000000000000000000hhhh0000000",
         ".9999mmm99999mm99mmmmmmmm999999000999999998800000000000000000000000000000000hhh00000000",
         "..999999999999999mmmmmlll999999008999999999980000000000000000000000000000000hhh0000000."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "cloud-meadow",
@@ -1518,8 +1501,7 @@
         "88888888fffffffffff8888888888888ffffffff8fffffffffffffffffffffffff88888888",
         "8888888ffffffff8888888f888888888888fffff88fffffffffffffffffffff8ff88888888",
         ".88ff88ffffffff888888888f8888888888fffff8888888ffffffffffffffff8ffffff888."
-      ],
-      "series": "doudou-original"
+      ]
     },
     {
       "id": "conan-conan",

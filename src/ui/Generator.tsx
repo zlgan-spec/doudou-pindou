@@ -407,6 +407,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     const nameNow = (newName ?? docName).trim();
     if (newName !== undefined) setDocName(newName);
     if (patternId) {
+      if (!window.confirm(`取消收藏「${nameNow || '未命名'}」？取消后找不回来。`)) return;
       deletePattern(patternId);
       setPatternId(null);
       return;

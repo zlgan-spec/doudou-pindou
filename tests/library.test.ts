@@ -9,7 +9,7 @@ describe('系列', () => {
   it('图纸带上系列 id，清单里没有的系列当没写', () => {
     const lib = parseLibrary({ series: [cats], patterns: [pattern('cat-1', 'golden-cat'), pattern('x', 'no-such')] });
     expect(lib.patterns.map(p => p.series)).toEqual(['golden-cat', null]);
-    expect(lib.series).toEqual([{ ...cats, featured: false }]);
+    expect(lib.series).toEqual([cats]);
   });
 
   it('系列 id 格式不对、没有名字、重复的都跳过', () => {
