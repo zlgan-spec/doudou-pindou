@@ -1,0 +1,14 @@
+node_modules
+dist
+.DS_Store
+test-output*
+test-images
+
+# 编辑器的本地目录
+.claude/
+
+# 本地环境变量和私有配置，永远不进仓库
+.env
+.env.*
+!.env.example
+*.local
