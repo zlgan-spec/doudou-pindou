@@ -21,6 +21,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
+          check-latest: true # 每次用 22 的最新补丁版，不用运行环境缓存里的旧版（2026-10 缓存里是有 Brotli 漏洞的 22.23.3）
           cache: npm
       - run: npm ci
       - run: npm test
