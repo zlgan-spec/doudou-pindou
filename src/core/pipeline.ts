@@ -538,20 +538,33 @@ function flatRadius(options: PatternOptions): number {
 
 /**
  * 「颜色数量」往右用的多色版：同一张图尽量多分出颜色，最多 MAX_COLORS。
- * 平涂图聚类半径越小不一定颜色越多（太碎会被清理并回去），所以几档各出一次，取颜色最多的那张
+ * 平涂图聚类半径越小不一定颜色越多（太碎会被清理并回去），所以几档各出一次，取颜色最多的那张。
+ * 还是不比刚生成的多（照片已经用上了图里所有颜色、简单的卡通、像素画），就按照片的办法逐格找最近色、留住细碎的颜色，
+ * 保证滑块往右总有颜色可加
  */
 export function generateRich(input: PatternInput, options: PatternOptions): Grid {
   const kind = resolveKind(input);
   const opts = { ...options, maxColors: MAX_COLORS };
-  if (kind !== 'flat') return generatePattern({ ...input, kind }, opts);
-  const start = flatRadius(options);
-  let best: Grid | null = null, most = -1;
-  for (const r of [start, ...FLAT_RADIUS_STEPS.filter(r => r < start)]) {
-    const g = generateFromFlat({ ...input, kind }, { ...opts, clusterRadius: r });
-    const n = legendOf(g).length;
-    if (n > most) [best, most] = [g, n];
+  const base = legendOf(generatePattern({ ...input, kind }, options)).length;
+  let best: Grid, most: number;
+  if (kind === 'flat') {
+    const start = flatRadius(options);
+    [best, most] = [createGrid(1, 1), -1];
+    for (const r of [start, ...FLAT_RADIUS_STEPS.filter(r => r < start)]) {
+      const g = generateFromFlat({ ...input, kind }, { ...opts, clusterRadius: r });
+      const n = legendOf(g).length;
+      if (n > most) [best, most] = [g, n];
+    }
+  } else if (kind === 'photo') {
+    best = generateFromPhoto({ image: input.image, mask: input.mask }, { ...opts, keepShades: true });
+    most = legendOf(best).length;
+  } else {
+    best = generatePattern({ ...input, kind }, opts);
+    most = legendOf(best).length;
   }
-  return best!;
+  if (most > base || kind === 'photo') return best;
+  const shades = generateFromPhoto({ image: input.image, mask: input.mask }, { ...opts, keepShades: true });
+  return legendOf(shades).length > most ? shades : best;
 }
 
 export function generatePattern(input: PatternInput, options: PatternOptions): Grid {

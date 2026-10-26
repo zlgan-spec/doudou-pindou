@@ -23,6 +23,8 @@ export interface PhotoOptions {
   maxColors?: number;
   /** 自定义尺寸：图案按比例放进 w×h 颗以内，放到能装下它的豆板上（不铺满背景） */
   fit?: { w: number; h: number };
+  /** 留住细碎的颜色：不清孤豆、不并零碎色（「颜色数量」往右加色用的多色版） */
+  keepShades?: boolean;
 }
 
 const ISOLATED_MERGE = 0.12; // 孤豆和周围最多的颜色差这么多以内才换（再远就是眼睛、高光这类真细节）
@@ -157,8 +159,10 @@ export function generateFromPhoto(input: PhotoInput, options: PhotoOptions): Gri
 
   // 2–4. 收敛色数 → 清孤豆 → 零碎色
   capColors(codes, options.maxColors ?? size.autoMaxColors);
-  codes = mergeIsolated(codes, cols, rows);
-  codes = mergeRareColors(codes, MIN_BEADS_PER_COLOR);
+  if (!options.keepShades) {
+    codes = mergeIsolated(codes, cols, rows);
+    codes = mergeRareColors(codes, MIN_BEADS_PER_COLOR);
+  }
 
   // 放板：保留背景时占满，空格用图案边上最多的颜色补；抠图时居中留边。自定义尺寸放到能装下它的豆板上，不铺满
   const area = options.fit ? boardArea(cols, rows) : { width: size.board, height: size.board };
