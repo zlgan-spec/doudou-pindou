@@ -647,6 +647,16 @@ a { color: inherit; }
 .modal-head .palette-search { min-width: 0; width: 96px; margin-left: auto; margin-right: 8px; padding: 5px 12px; font-size: 13px; }
 .palette-empty { margin: 14px 0; font-size: 13px; color: var(--muted); }
 
+/* ---------- 新手引导 ---------- */
+/* 亮框四周用一圈超大阴影压暗，整层挡住点击，只能点说明卡里的按钮 */
+.guide { position: fixed; inset: 0; z-index: 50; }
+.guide-hole { position: fixed; border-radius: var(--radius); box-shadow: 0 0 0 9999px rgba(10, 10, 10, 0.5); transition: left 0.3s var(--ease-out), top 0.3s var(--ease-out), width 0.3s var(--ease-out), height 0.3s var(--ease-out); pointer-events: none; }
+.guide-card { position: fixed; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.35); animation: enter-up 0.25s var(--ease-out) both; }
+.guide-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.guide-card p { margin: 6px 0 14px; font-size: 14px; line-height: 1.6; }
+.guide-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .guide-hole { transition: none; } .guide-card { animation: none; } }
+
 /* ---------- 用户协议 ---------- */
 .terms { display: flex; flex-direction: column; }
 .terms > section { display: grid; grid-template-columns: minmax(180px, 280px) minmax(0, 720px); column-gap: clamp(32px, 5vw, 80px); padding: 28px 0; border-top: 1px solid var(--line); }

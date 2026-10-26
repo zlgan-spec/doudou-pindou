@@ -9,6 +9,7 @@ import { legendOf, type Grid } from '../core/grid';
 import { colorOf } from '../core/palette';
 import { boardName, hitCell, hitLegend, renderSheet, renderSheetDiff, sheetLayout, sheetLogoReady } from '../render/sheet';
 import { Logo } from './Logo';
+import { Guide } from './Guide';
 import { PalettePicker } from './PalettePicker';
 import { embedPattern, sheetFileName } from './pngData';
 import { makeZip } from './zip';
@@ -64,6 +65,7 @@ const TOOL_BY_KEY = new Map(TOOLS.map(t => [t.key.toLowerCase(), t.id]));
 const COLLAPSE = <svg viewBox="0 0 24 24" aria-hidden><path d="M4 6h16M10 12h10M4 18h16M7 9.5L4.5 12 7 14.5" /></svg>;
 
 const ICON = {
+  help: <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6" /><path d="M12 16.8v.2" /></svg>,
   undo: <svg viewBox="0 0 24 24" aria-hidden><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>,
   redo: <svg viewBox="0 0 24 24" aria-hidden><path d="M15 14l5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></svg>,
   gridAll: <svg viewBox="0 0 24 24" aria-hidden><rect x="4" y="4" width="16" height="16" rx="1.5" /><path d="M9.3 4v16M14.7 4v16M4 9.3h16M4 14.7h16" /></svg>,
@@ -1360,6 +1362,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     setActionSlot(document.getElementById('page-actions'));
     setTitleSlot(document.getElementById('page-title'));
   }, []);
+  const [guideRun, setGuideRun] = useState(0); // 点「?」加 1，引导从头放
   // 收藏时还没起名：星标下面弹个小框起名，也可以跳过
   const [askName, setAskName] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -1455,6 +1458,8 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
           onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
         />
       )}
+      {/* 第一次进编辑器：一步步亮出工具栏、色号清单、下载 */}
+      {active && <Guide replay={guideRun} />}
       {/* 收藏 / 导入 / 导出放进顶栏右侧，不再单独占一行 */}
       {active && actionSlot && createPortal(
         <>
@@ -1476,7 +1481,9 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
             </div>
           )}
           {onImport && <button className="btn soft pill btn-icon" onClick={onImport} title="换一张图，或导入存过的图纸 PNG">{ICON.import}导入</button>}
-          <button className="btn primary pill btn-icon" onClick={save} disabled={exporting} title="下载高清图纸 PNG，拖回来能接着改">{ICON.export}{exporting ? '正在下载…' : '下载'}</button>
+          <button className="btn primary pill btn-icon" onClick={save} disabled={exporting} title="下载高清图纸 PNG，拖回来能接着改" data-guide="download">{ICON.export}{exporting ? '正在下载…' : '下载'}</button>
+          {/* 重看新手引导：和深浅色切换同一个圆形按钮 */}
+          <button className="theme-toggle" onClick={() => setGuideRun(n => n + 1)} aria-label="使用引导" title="使用引导">{ICON.help}</button>
         </>,
         actionSlot,
       )}
@@ -1569,7 +1576,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         );
       })()}
       {/* 左边竖排工具栏：图标 + 字；要用颜色的工具下面跟着当前颜色 */}
-      <div className="tool-rail" ref={railRef} role="toolbar" aria-label="编辑工具">
+      <div className="tool-rail" ref={railRef} role="toolbar" aria-label="编辑工具" data-guide="tools">
         {TOOLS.map(t => (
           <button
             key={t.id}
@@ -1707,7 +1714,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
 
       </div>
 
-      <aside className="bead-list" aria-label="色号清单">
+      <aside className="bead-list" aria-label="色号清单" data-guide="beads">
         <div className="bead-list-head">
           <span className="kicker">色号清单</span>
           <button className="bead-collapse" onClick={toggleCollapsed} aria-expanded={!collapsed} aria-label={collapsed ? '展开色号清单' : '收起色号清单'} title={collapsed ? '展开' : '收起，只看色块'}>
