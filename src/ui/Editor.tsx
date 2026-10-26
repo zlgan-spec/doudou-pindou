@@ -1780,6 +1780,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
           title={picker.mode === 'replace' ? `把 ${picker.from} 全部替换为` : picker.mode === 'outline' ? '描边颜色' : picker.mode === 'textColor' ? '文字颜色' : '选择颜色'}
           highlight={legend.map(l => l.code)}
           current={picker.mode === 'replace' ? picker.from : picker.mode === 'outline' ? rings[picker.ring] : picker.mode === 'textColor' ? textColor : color}
+          similarTo={picker.mode === 'replace' ? picker.from : undefined}
           onClose={() => setPicker(null)}
           onPick={code => {
             if (picker.mode === 'textColor') setTextColor(code);

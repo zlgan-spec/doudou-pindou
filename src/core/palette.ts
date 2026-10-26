@@ -43,3 +43,19 @@ export function nearest(lab: Lab, candidates: readonly BeadColor[] = PALETTE): B
   }
   return best;
 }
+
+// 替换颜色时的「相近」：图里已有、又还算像的排前面（换过去还能少一种色，手里也多半有这颗豆），最多占 2 个；剩下补最接近的新色
+const SIMILAR_COUNT = 4;
+const MAX_IN_USE = 2;
+const IN_USE_RADIUS = 0.1; // 已有的颜色离得比这近才推荐：灰色 H22 → 灰 H3 约 0.075 算，→ 肤色 G3 约 0.126 不算
+
+export function similarColors(code: string, inUse: readonly string[]): Array<{ color: BeadColor; inUse: boolean }> {
+  const from = colorOf(code).lab;
+  const used = new Set(inUse);
+  const byDistance = PALETTE.filter(c => c.code !== code)
+    .map(c => ({ color: c, d: matchDistance(from, c.lab), inUse: used.has(c.code) }))
+    .sort((a, b) => a.d - b.d);
+  const near = byDistance.filter(x => x.inUse && x.d < IN_USE_RADIUS).slice(0, MAX_IN_USE);
+  const fresh = byDistance.filter(x => !x.inUse).slice(0, SIMILAR_COUNT - near.length);
+  return [...near, ...fresh].map(({ color, inUse }) => ({ color, inUse }));
+}

@@ -632,7 +632,8 @@ a { color: inherit; }
 .btn-replace i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.5); }
 .btn-replace span { margin-left: 2px; font-size: 15px; }
 .card-preview { height: 84px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 600; font-size: 26px; border: 1px solid rgba(0, 0, 0, 0.08); }
-.palette-modal { width: min(720px, 100%); max-height: 80vh; display: flex; flex-direction: column; }
+/* 高度固定：输色号筛选时弹层不跟着缩、不跳 */
+.palette-modal { width: min(720px, 100%); height: min(80vh, 720px); display: flex; flex-direction: column; }
 .palette-scroll { overflow-y: auto; }
 .palette-scroll h4 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); font-weight: 500; }
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
@@ -640,6 +641,11 @@ a { color: inherit; }
 .swatch:hover { outline: 2px solid var(--ink); outline-offset: 1px; transform: scale(1.04); }
 /* 当前颜色：和色号清单「只看这一色」同一个样式（隔一圈白再套一圈细黑边），全站选中颜色都长这样 */
 .swatch.current, .swatch.current:hover { outline: none; transform: none; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+/* 「相近」里图里已有的色：右下角一个小灰点（隔一圈白，深浅底色上都看得见），不压色号 */
+.swatch.in-use { position: relative; }
+.swatch.in-use::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 1.5px var(--surface); }
+.modal-head .palette-search { min-width: 0; width: 96px; margin-left: auto; margin-right: 8px; padding: 5px 12px; font-size: 13px; }
+.palette-empty { margin: 14px 0; font-size: 13px; color: var(--muted); }
 
 /* ---------- 用户协议 ---------- */
 .terms { display: flex; flex-direction: column; }
