@@ -51,10 +51,11 @@ npm test
 - [x] Image to pattern, online editing, re-editable downloads
 - [x] Auto and custom sizes, large patterns split into 104 boards
 - [x] Two-way color count adjustment
-- [ ] Pattern library: original patterns, added over time
+- [x] Pattern library: original patterns, added over time
+- [x] Line cleanup
 - [ ] Full background fill (for coasters)
 - [ ] One-click palette swap
-- [ ] Line cleanup and mirror symmetry
+- [ ] Mirror symmetry fix
 
 ## Contributing
 
