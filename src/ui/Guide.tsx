@@ -10,7 +10,7 @@ const CARD_H = 172; // 说明卡大概多高（两行字），放上下时按它
 // 目标用 data-guide 标在元素上（Editor 里），改布局不用改这里；同名的几个元素合成一块亮
 const STEPS: Array<{ target: string; text: string }> = [
   { target: 'file', text: '为图纸命名、收藏 / 导入 / 下载图纸' },
-  { target: 'beads', text: '颜色功能区，点击颜色右侧 ⋯ 探索更多功能' },
+  { target: 'beads', text: '颜色功能区，点击颜色右侧 ⋯ 可替换或删除颜色' },
   { target: 'tools', text: '图纸具体的修改功能，可进行 DIY 绘制' },
   { target: 'view', text: '切换不同视图，包括网格、放大缩小、全屏等' },
 ];
