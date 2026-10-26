@@ -1438,6 +1438,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
             maxLength={30}
             aria-label="图纸名字"
             title="点击改名"
+            data-guide="file"
             // 宽度跟着字数走（中文一个字约 1em，英文数字约半个），再加上左右内边距
             style={{ width: `calc(${Math.min(16, Math.max(4, [...(name || '未命名豆图')].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1 : 0.6), 0) + 0.5))}em + 18px)` }}
             onChange={e => onRename(e.target.value)}
@@ -1458,13 +1459,13 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
           onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
         />
       )}
-      {/* 第一次进编辑器：一步步亮出工具栏、色号清单、下载 */}
+      {/* 第一次进编辑器：一步步亮出右上角文件操作、色号清单、工具栏、右下角看图 */}
       {active && <Guide replay={guideRun} />}
       {/* 收藏 / 导入 / 导出放进顶栏右侧，不再单独占一行 */}
       {active && actionSlot && createPortal(
         <>
           {onToggleStar && (
-            <div className="star-wrap" ref={starRef}>
+            <div className="star-wrap" ref={starRef} data-guide="file">
               <button className="btn soft pill icon-only" onClick={clickStar} aria-pressed={starred} aria-label={starred ? '已收藏' : '收藏'} title={starred ? '已在「我的收藏」，点击取消收藏' : '收藏到「我的收藏」，之后的修改会自动保存'}>
                 {ICON.star}
               </button>
@@ -1480,8 +1481,8 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
               )}
             </div>
           )}
-          {onImport && <button className="btn soft pill btn-icon" onClick={onImport} title="换一张图，或导入存过的图纸 PNG">{ICON.import}导入</button>}
-          <button className="btn primary pill btn-icon" onClick={save} disabled={exporting} title="下载高清图纸 PNG，拖回来能接着改" data-guide="download">{ICON.export}{exporting ? '正在下载…' : '下载'}</button>
+          {onImport && <button className="btn soft pill btn-icon" onClick={onImport} title="换一张图，或导入存过的图纸 PNG" data-guide="file">{ICON.import}导入</button>}
+          <button className="btn primary pill btn-icon" onClick={save} disabled={exporting} title="下载高清图纸 PNG，拖回来能接着改" data-guide="file">{ICON.export}{exporting ? '正在下载…' : '下载'}</button>
           {/* 重看新手引导：和深浅色切换同一个圆形按钮 */}
           <button className="theme-toggle" onClick={() => setGuideRun(n => n + 1)} aria-label="使用引导" title="使用引导">{ICON.help}</button>
         </>,

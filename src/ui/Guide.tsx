@@ -1,4 +1,4 @@
-// 新手引导：第一次进编辑器时，别处变暗、只亮一块，一步一句话讲清楚在哪改图、看用量、下载。看过（或跳过）一次就不再自动出现，点顶栏的「?」重看
+// 新手引导：第一次进编辑器时，别处变暗、只亮一块，一个分区一句话：右上角文件操作 → 色号清单 → 工具栏 → 右下角看图。看过（或跳过）一次就不再自动出现，点顶栏的「?」重看
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -7,13 +7,23 @@ const PAD = 6; // 亮出来的框比目标大一圈
 const GAP = 12; // 说明卡离亮框的距离
 const CARD_H = 172; // 说明卡大概多高（两行字），放上下时按它留位置
 
-// 目标用 data-guide 标在元素上（Editor 里），改布局不用改这里。touch：手机、平板上换个说法（没有空格键，用手指）
+// 目标用 data-guide 标在元素上（Editor 里），改布局不用改这里；同名的几个元素合成一块亮。touch：手机、平板上换个说法（没有空格键，用手指）
 const STEPS: Array<{ target: string; text: string; touch?: string }> = [
-  { target: 'tools', text: '在这里改图：画笔、填充、橡皮，改错了能撤销' },
+  { target: 'file', text: '起名、收藏、导入图片或图纸，做好了点「下载」' },
+  { target: 'beads', text: '这张图要用的色号和颗数，下面调颜色数量和豆板尺寸' },
+  { target: 'tools', text: '拖动、画笔、橡皮、填充等改图工具，改错了能撤销' },
   { target: 'view', text: '切换网格、放大缩小、全屏看图；按住空格能拖动图纸', touch: '切换网格、放大缩小、全屏看图；两根手指能拖动和缩放图纸' },
-  { target: 'beads', text: '要用哪些色号、各多少颗都在这里，下面能调颜色数量和豆板尺寸' },
-  { target: 'download', text: '做好了点这里下载图纸，拖回网站还能接着改' },
 ];
+
+/** 同一步的几个元素合成一个框；不在同一行的（手机上名字在图纸上方、按钮在底部）只取和最后一个同一行的 */
+function targetRect(els: HTMLElement[]): DOMRect | null {
+  const rects = els.map(e => e.getBoundingClientRect()).filter(r => r.width && r.height);
+  if (!rects.length) return null;
+  const anchor = rects[rects.length - 1], mid = anchor.top + anchor.height / 2;
+  const row = rects.filter(r => Math.abs(r.top + r.height / 2 - mid) < anchor.height);
+  const left = Math.min(...row.map(r => r.left)), top = Math.min(...row.map(r => r.top));
+  return new DOMRect(left, top, Math.max(...row.map(r => r.right)) - left, Math.max(...row.map(r => r.bottom)) - top);
+}
 
 function seen(): boolean {
   try {
@@ -58,7 +68,8 @@ export function Guide({ replay = 0 }: { replay?: number }) {
     return null;
   }), []);
 
-  const el = step === null ? null : document.querySelector<HTMLElement>(`[data-guide="${STEPS[step].target}"]`);
+  const els = step === null ? [] : [...document.querySelectorAll<HTMLElement>(`[data-guide="${STEPS[step].target}"]`)];
+  const el = els.length ? els[els.length - 1] : null;
 
   // 跟着目标走：滚到能看见，窗口变化、滚动时重新量
   useLayoutEffect(() => {
@@ -71,8 +82,9 @@ export function Guide({ replay = 0 }: { replay?: number }) {
     }
     // 滚到屏幕中间：贴着顶部会被吸顶的导航栏挡住（手机上工具栏就在图纸上方）
     const r0 = el.getBoundingClientRect();
-    if (r0.top < 80 || r0.bottom > window.innerHeight - 16) el.scrollIntoView({ block: 'center', inline: 'nearest' });
-    const measure = () => setRect(el.getBoundingClientRect());
+    const sticky = el.closest('.topbar, .page-actions'); // 顶栏、手机底部按钮条本来就固定在屏幕上，不用滚
+    if (!sticky && (r0.top < 80 || r0.bottom > window.innerHeight - 16)) el.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const measure = () => setRect(targetRect(els));
     // 目标刚出现时还在播入场动画、滚动也要一会儿：头一秒每帧都量，跟上它停下来的位置
     const until = performance.now() + 1000;
     let raf = 0;
@@ -88,6 +100,8 @@ export function Guide({ replay = 0 }: { replay?: number }) {
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };
+    // els 每次渲染都是新数组，跟着 el（最后一个）变就够了
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, el, finish]);
 
   useEffect(() => {
@@ -117,14 +131,15 @@ export function Guide({ replay = 0 }: { replay?: number }) {
   const CARD_W = Math.min(280, window.innerWidth - 32);
   const vw = window.innerWidth, vh = window.innerHeight;
   let left: number, top: number;
-  if (hole.left + hole.width + GAP + CARD_W <= vw - 16) {
+  const wide = hole.width > hole.height * 2; // 横条（顶栏按钮、右下角）：说明卡放上下，放左右会挡住别的按钮
+  if (!wide && hole.left + hole.width + GAP + CARD_W <= vw - 16) {
     left = hole.left + hole.width + GAP;
     top = hole.top;
-  } else if (hole.left - GAP - CARD_W >= 16) {
+  } else if (!wide && hole.left - GAP - CARD_W >= 16) {
     left = hole.left - GAP - CARD_W;
     top = hole.top;
   } else {
-    left = hole.left + hole.width / 2 - CARD_W / 2;
+    left = hole.left + hole.width - CARD_W; // 右对齐：这几块都靠右
     top = hole.top + hole.height + GAP + CARD_H <= vh - 16 ? hole.top + hole.height + GAP : hole.top - GAP - CARD_H;
   }
   left = Math.max(16, Math.min(left, vw - CARD_W - 16));
