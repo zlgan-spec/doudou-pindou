@@ -18,7 +18,7 @@ import { readPattern } from './pngData';
 import { clearDraft, loadDraft, saveDraft, type Draft } from './draft';
 import { FileTooLargeError, isHeic, loadImage, MAX_FILE_BYTES } from './loadImage';
 import { imageFromPaste } from './paste';
-import { createPattern, deletePattern, getPattern, subscribe, updatePattern, type PatternEntry } from './store';
+import { createPattern, deletePattern, getPattern, listPatterns, subscribe, updatePattern, type PatternEntry } from './store';
 
 interface Source {
   image: RgbaImage;
@@ -163,6 +163,15 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       pendingStore.current = null;
     };
   }, [history, patternId, docName]);
+
+  // 从图纸库打开、之前已经收藏过的：图纸没改时按钮显示「已收藏」，点了是取消那份收藏；
+  // 改过就是新的一份，按钮回到「收藏」，点了另存一份，不覆盖收藏里那份（那份可能是之前改过的）
+  const libOriginal = useRef(opened && !opened.id && opened.libId ? history?.present : undefined);
+  const findLibStarred = () => (opened?.libId ? listPatterns().find(e => e.libId === opened.libId) : undefined);
+  const [libStarred, setLibStarred] = useState(() => !!libOriginal.current && !!findLibStarred());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => (libOriginal.current ? subscribe(() => setLibStarred(!!findLibStarred())) : undefined), []);
+  const showLibStarred = !patternId && libStarred && !!history && history.present === libOriginal.current;
 
   // 在"我的收藏"页改了收藏 / 删除，这边同步
   useEffect(() => subscribe(() => {
@@ -412,6 +421,11 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       setPatternId(null);
       return;
     }
+    if (showLibStarred) {
+      const mine = findLibStarred();
+      if (mine && window.confirm(`取消收藏「${mine.name}」？取消后找不回来。`)) deletePattern(mine.id);
+      return;
+    }
     const doc = history.present;
     const id = createPattern({ name: nameNow || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, tags: opened?.tags, libId: opened?.libId });
     if (!id) setError('浏览器空间满了，收藏不进去。到「我的收藏」删掉几张，或先导出备份。');
@@ -503,7 +517,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
               onHistory={setHistory}
               style={style}
               fullBoard={fullBoard}
-              starred={!!patternId}
+              starred={!!patternId || showLibStarred}
               onImport={pick}
               reference={source ? reference : null}
               active={active}

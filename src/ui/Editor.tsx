@@ -1149,9 +1149,9 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const [mergeOpen, setMergeOpen] = useState(false);
   // 「豆板尺寸」也是平时一行，点开换
   const [sizeOpen, setSizeOpen] = useState(false);
-  const tiles = boardTiles(doc.grid.width, doc.grid.height);
   const boardNow = boardFor(doc.grid.width, doc.grid.height);
-  const boardShort = boardNow ? SIZES[boardNow].label : `${tiles.cols}×${tiles.rows} 块`;
+  // 和选项一样写颗数：自定义生成的写用户填的宽高，其余超过 104 的写整张图纸的宽高（要几块板在点开后的小字里）
+  const boardShort = sizing?.value.mode === 'custom' ? `${sizing.value.w}×${sizing.value.h}` : boardNow ? SIZES[boardNow].label : `${doc.grid.width}×${doc.grid.height}`;
   // 没有原图（收藏、草稿、导入的图纸）：换尺寸 = 图案原样换到别的豆板上，四周多出空位画别的；放不下才缩小。可以撤销
   const ownSizing: Sizing = { mode: boardNow ?? 'custom', w: doc.grid.width, h: doc.grid.height }; // 选中的就是现在用的板
   const resizeBoard = (v: Sizing) => {
