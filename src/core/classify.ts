@@ -114,10 +114,68 @@ export function gradientShare(image: RgbaImage, mask: Mask | null): number {
 // 实测（2026-10-04，11 张图）：照片 0.37~0.50，卡通/贴纸/AI 像素风 0.16~0.27
 const FLAT_MAX_GRADIENT = 0.3;
 
+// 白底产品照、棚拍人像、近景（2026-10-26，49 张测试图）：渐变占比在 0.15~0.3，按上面会被当成平涂图、出来一块一块的。
+// 它们颜色比平涂碎（细分颜色占比 0.12~0.2），又有大片几乎完全同色的底（相邻像素几乎相同 > 0.45）；
+// 卡通全家福这类细碎插画颜色更碎（> 0.25），蜡笔、纸纹插画几乎同色的少（< 0.4），AI 卡通颜色很整（< 0.05）
+const PHOTO_MIN_GRADIENT = 0.15;
+const PHOTO_FINE_COLORS: [number, number] = [0.12, 0.2];
+const PHOTO_MIN_SAME = 0.45;
+
+/** 细分颜色占比：取样像素按细一档的色格分，有多少种 / 取样数 */
+function fineColorShare(labs: Lab[]): number {
+  const keys = new Set(labs.map(l => `${Math.round(l[0] * 100)},${Math.round(l[1] * 200)},${Math.round(l[2] * 200)}`));
+  return keys.size / labs.length;
+}
+
+/** 缩到长边 400 左右（块平均），相邻两像素 RGB 每个通道都差不到 3 的比例：平涂、纯色底高，照片噪点多就低 */
+function sameNeighborShare(image: RgbaImage, mask: Mask | null): number {
+  const { width, height } = image;
+  const k = Math.max(1, Math.ceil(Math.max(width, height) / 400));
+  const w = Math.floor(width / k), h = Math.floor(height / k);
+  const px = new Float32Array(w * h * 3);
+  const opaque = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r = 0, g = 0, b = 0, n = 0, on = 0;
+      for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) {
+        const i = (y * k + dy) * width + x * k + dx;
+        r += image.data[i * 4];
+        g += image.data[i * 4 + 1];
+        b += image.data[i * 4 + 2];
+        n++;
+        if ((mask ? mask.data[i] : image.data[i * 4 + 3] / 255) >= 0.5) on++;
+      }
+      const o = (y * w + x) * 3;
+      px[o] = r / n;
+      px[o + 1] = g / n;
+      px[o + 2] = b / n;
+      opaque[y * w + x] = on * 2 >= n ? 1 : 0;
+    }
+  }
+  let total = 0, same = 0;
+  const close = (a: number, b: number) => Math.abs(px[a] - px[b]) <= 2.5 && Math.abs(px[a + 1] - px[b + 1]) <= 2.5 && Math.abs(px[a + 2] - px[b + 2]) <= 2.5;
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w - 1; x++) {
+      const i = y * w + x;
+      if (!opaque[i]) continue;
+      for (const j of [i + 1, i + w]) {
+        total++;
+        if (close(i * 3, j * 3)) same++;
+      }
+    }
+  }
+  return total ? same / total : 0;
+}
+
 export function classifyInput(image: RgbaImage, mask: Mask | null): InputKind {
   const labs = subjectLabs(image, mask);
   if (labs.length < 50) return 'photo';
-  if (gradientShare(image, mask) >= FLAT_MAX_GRADIENT) return 'photo';
+  const gradient = gradientShare(image, mask);
+  if (gradient >= FLAT_MAX_GRADIENT) return 'photo';
+  if (gradient >= PHOTO_MIN_GRADIENT) {
+    const fine = fineColorShare(labs);
+    if (fine > PHOTO_FINE_COLORS[0] && fine < PHOTO_FINE_COLORS[1] && sameNeighborShare(image, mask) > PHOTO_MIN_SAME) return 'photo';
+  }
   const sizes = clusterSizes(labs, CLUSTER_RADIUS);
   const total = sizes.reduce((a, b) => a + b, 0);
   let covered = 0;
