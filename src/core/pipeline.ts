@@ -19,8 +19,6 @@ export interface PatternOptions {
   maxColors?: number;
   /** 自定义尺寸：图案按比例放进 w×h 颗以内（不留边），再放到能装下它的豆板上；超过 104 用几块 104 板拼。size 只管色数和清理力度 */
   fit?: { w: number; h: number };
-  /** 平涂图的聚类半径，不给就按豆板定（generateRich 用来试不同档） */
-  clusterRadius?: number;
 }
 
 export interface PatternInput {
@@ -530,41 +528,28 @@ function generateFromFlat(input: PatternInput, options: PatternOptions): Grid {
 // 板越大能放下越多明暗细节，颜色分得越细，默认色数跟着板变多
 const FLAT_RADIUS: Record<SizeId, number> = { small: 0.06, medium: 0.045, large: 0.035 };
 const FLAT_RADIUS_BEYOND = 0.03; // 超过一块 104 板的大图
-const FLAT_RADIUS_STEPS = [0.05, 0.042, 0.035, 0.028, 0.022, 0.017]; // 多色版要试的几档；再细就碎成一颗一颗，清理时又并回去，颜色反而少
 function flatRadius(options: PatternOptions): number {
-  if (options.clusterRadius) return options.clusterRadius;
   return options.fit && Math.max(options.fit.w, options.fit.h) > SIZES.large.board ? FLAT_RADIUS_BEYOND : FLAT_RADIUS[options.size];
 }
 
 /**
  * 「颜色数量」往右用的多色版：同一张图尽量多分出颜色，最多 MAX_COLORS。
- * 平涂图聚类半径越小不一定颜色越多（太碎会被清理并回去），所以几档各出一次，取颜色最多的那张。
- * 还是不比刚生成的多（照片已经用上了图里所有颜色、简单的卡通、像素画），就按照片的办法逐格找最近色、留住细碎的颜色，
- * 保证滑块往右总有颜色可加
+ * 照片：留住细碎的颜色（不清孤豆、不并零碎色）。卡通、像素画：按照片的办法逐格找最近色再出一份，摆法和刚生成的一样（留边、不铺满），
+ * 往右拖图案不跳。2026-10-26 在 57 种卡通 × 尺寸上比过：它的颜色总比平涂按几档聚类半径各出一次取最多的那份多，还快几倍，那套就不再跑
  */
 export function generateRich(input: PatternInput, options: PatternOptions): Grid {
   const kind = resolveKind(input);
   const opts = { ...options, maxColors: MAX_COLORS };
-  const base = legendOf(generatePattern({ ...input, kind }, options)).length;
-  let best: Grid, most: number;
-  if (kind === 'flat') {
-    const start = flatRadius(options);
-    [best, most] = [createGrid(1, 1), -1];
-    for (const r of [start, ...FLAT_RADIUS_STEPS.filter(r => r < start)]) {
-      const g = generateFromFlat({ ...input, kind }, { ...opts, clusterRadius: r });
-      const n = legendOf(g).length;
-      if (n > most) [best, most] = [g, n];
-    }
-  } else if (kind === 'photo') {
-    best = generateFromPhoto({ image: input.image, mask: input.mask }, { ...opts, keepShades: true });
-    most = legendOf(best).length;
-  } else {
-    best = generatePattern({ ...input, kind }, opts);
-    most = legendOf(best).length;
-  }
-  if (most > base || kind === 'photo') return best;
-  const shades = generateFromPhoto({ image: input.image, mask: input.mask }, { ...opts, keepShades: true });
-  return legendOf(shades).length > most ? shades : best;
+  const photoInput = { image: input.image, mask: input.mask };
+  if (kind === 'photo') return generateFromPhoto(photoInput, { ...opts, keepShades: true });
+  const size = SIZES[options.size];
+  const fit = options.fit ?? { w: size.maxSubject, h: size.maxSubject };
+  const shades = generateFromPhoto(photoInput, { ...opts, fit });
+  if (kind === 'flat') return shades;
+  // 像素画：本来就是按豆子画好的，清理后颜色常常又回到原样，碎色也留着，至少往右还能加
+  const pixel = generatePattern({ ...input, kind }, opts);
+  const raw = generateFromPhoto(photoInput, { ...opts, fit, keepShades: true });
+  return [pixel, shades, raw].reduce((a, b) => (legendOf(b).length > legendOf(a).length ? b : a));
 }
 
 export function generatePattern(input: PatternInput, options: PatternOptions): Grid {
