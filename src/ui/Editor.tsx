@@ -1687,7 +1687,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         <button className="float-btn" onClick={() => onHistory(undo(history))} disabled={!history.past.length} title="撤销（⌘Z）" aria-label="撤销">{ICON.undo}</button>
         <button className="float-btn" onClick={() => onHistory(redo(history))} disabled={!history.future.length} title="重做（⇧⌘Z）" aria-label="重做">{ICON.redo}</button>
       </div>
-      <div className="float-bar right">
+      <div className="float-bar right" data-guide="view">
         <button className="float-btn" onClick={() => setGridView(g => GRID_NEXT[g])} title={`${GRID_LABEL[gridView]}（点一下切换）`} aria-label={GRID_LABEL[gridView]}>
           {ICON[({ all: 'gridAll', major: 'gridMajor', none: 'gridNone', preview: 'gridPreview' } as const)[gridView]]}
         </button>

@@ -7,9 +7,10 @@ const PAD = 6; // 亮出来的框比目标大一圈
 const GAP = 12; // 说明卡离亮框的距离
 const CARD_H = 172; // 说明卡大概多高（两行字），放上下时按它留位置
 
-// 目标用 data-guide 标在元素上（Editor 里），改布局不用改这里
-const STEPS: Array<{ target: string; text: string }> = [
+// 目标用 data-guide 标在元素上（Editor 里），改布局不用改这里。touch：手机、平板上换个说法（没有空格键，用手指）
+const STEPS: Array<{ target: string; text: string; touch?: string }> = [
   { target: 'tools', text: '在这里改图：画笔、填充、橡皮，改错了能撤销' },
+  { target: 'view', text: '切换网格、放大缩小、全屏看图；按住空格能拖动图纸', touch: '切换网格、放大缩小、全屏看图；两根手指能拖动和缩放图纸' },
   { target: 'beads', text: '要用哪些色号、各多少颗都在这里，下面能调颜色数量和豆板尺寸' },
   { target: 'download', text: '做好了点这里下载图纸，拖回网站还能接着改' },
 ];
@@ -50,6 +51,12 @@ export function Guide({ replay = 0 }: { replay?: number }) {
     markSeen();
     setStep(null);
   }, []);
+  const next = useCallback(() => setStep(s => {
+    if (s === null) return s;
+    if (s < STEPS.length - 1) return s + 1;
+    markSeen();
+    return null;
+  }), []);
 
   const el = step === null ? null : document.querySelector<HTMLElement>(`[data-guide="${STEPS[step].target}"]`);
 
@@ -85,13 +92,25 @@ export function Guide({ replay = 0 }: { replay?: number }) {
 
   useEffect(() => {
     if (step === null) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') finish(); };
+    // 和常见的引导一样：→ ↓ 回车 空格 下一步，← ↑ 上一步，Esc 关掉（不用滚轮翻，触控板一碰就翻页）
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return finish();
+      const onButton = e.target instanceof HTMLButtonElement; // 按钮上的回车、空格浏览器会自己点一下，这里再翻就翻两页
+      if (['ArrowRight', 'ArrowDown'].includes(e.key) || (!onButton && ['Enter', ' '].includes(e.key))) {
+        e.preventDefault();
+        next();
+      } else if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
+        e.preventDefault();
+        setStep(s => (s ? s - 1 : s));
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [step, finish]);
+  }, [step, finish, next]);
 
   if (step === null || !rect) return null;
   const last = step === STEPS.length - 1;
+  const touch = window.matchMedia('(pointer: coarse)').matches;
   const hole = { left: rect.left - PAD, top: rect.top - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 };
 
   // 说明卡放在亮框旁边：右边放得下放右边，否则左边，再不行放上下（手机）；都夹在屏幕里
@@ -111,15 +130,16 @@ export function Guide({ replay = 0 }: { replay?: number }) {
   left = Math.max(16, Math.min(left, vw - CARD_W - 16));
   top = Math.max(16, Math.min(top, vh - CARD_H - 16));
 
+  // 点哪里都是下一步（像常见的引导那样），只有「跳过」例外
   return createPortal(
-    <div className="guide" role="dialog" aria-modal="true" aria-label="新手引导">
+    <div className="guide" role="dialog" aria-modal="true" aria-label="新手引导" onClick={next}>
       <div className="guide-hole" style={hole} />
       <div className="guide-card" style={{ left, top, width: CARD_W }} key={step}>
-        <span className="guide-count">{step + 1} / {STEPS.length}</span>
-        <p>{STEPS[step].text}</p>
+        <span className="guide-count">{step + 1} / {STEPS.length} · {touch ? '点任意处继续' : '点任意处或按 → 继续'}</span>
+        <p>{(touch && STEPS[step].touch) || STEPS[step].text}</p>
         <div className="guide-actions">
-          {!last && <button className="btn link small" onClick={finish}>跳过</button>}
-          <button className="btn primary pill small" autoFocus onClick={() => (last ? finish() : setStep(step + 1))}>{last ? '知道了' : '下一步'}</button>
+          {!last && <button className="btn link small" onClick={e => { e.stopPropagation(); finish(); }}>跳过</button>}
+          <button className="btn primary pill small" autoFocus>{last ? '知道了' : '下一步'}</button>
         </div>
       </div>
     </div>,
