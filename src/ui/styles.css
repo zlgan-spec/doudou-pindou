@@ -11,7 +11,7 @@
   --card: #fafafa;
   --scene: #f5f5f5;
   --peg: #dedede;
-  --ring: #0066ff;
+  --ring: #0a0a0a; /* 键盘焦点框：跟整站黑白走，不用浏览器那种蓝 */
   --bead-side: #dedbd3;
   --bead-face: #ffffff;
   --danger: #dc2626;
@@ -45,7 +45,7 @@
   --card: #141414;
   --scene: #141414;
   --peg: #2e2e2e;
-  --ring: #3b82f6;
+  --ring: #fafafa;
   --bead-side: #2e2e2e;
   --bead-face: #111111;
   --on-ink: #0a0a0a;
@@ -494,6 +494,7 @@ a { color: inherit; }
 .bead-list li:hover .bead-more, .bead-more:focus-visible { opacity: 1; }
 .bead-more:hover { background: var(--surface); color: var(--ink); }
 @media (hover: none) { .bead-more { opacity: 1; } }
+[data-guide-step='beads'] .bead-more { opacity: 1; } /* 新手引导讲到「⋯」时露出来 */
 
 /* ---------- 图纸库 ---------- */
 .tab-body { animation: enter-up 0.45s var(--ease-out) both; }

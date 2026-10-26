@@ -7,12 +7,12 @@ const PAD = 6; // 亮出来的框比目标大一圈
 const GAP = 12; // 说明卡离亮框的距离
 const CARD_H = 172; // 说明卡大概多高（两行字），放上下时按它留位置
 
-// 目标用 data-guide 标在元素上（Editor 里），改布局不用改这里；同名的几个元素合成一块亮。touch：手机、平板上换个说法（没有空格键，用手指）
-const STEPS: Array<{ target: string; text: string; touch?: string }> = [
-  { target: 'file', text: '起名、收藏、导入图片或图纸，做好了点「下载」' },
-  { target: 'beads', text: '这张图要用的色号和颗数，下面调颜色数量和豆板尺寸' },
-  { target: 'tools', text: '拖动、画笔、橡皮、填充等改图工具，改错了能撤销' },
-  { target: 'view', text: '切换网格、放大缩小、全屏看图；按住空格能拖动图纸', touch: '切换网格、放大缩小、全屏看图；两根手指能拖动和缩放图纸' },
+// 目标用 data-guide 标在元素上（Editor 里），改布局不用改这里；同名的几个元素合成一块亮
+const STEPS: Array<{ target: string; text: string }> = [
+  { target: 'file', text: '为图纸命名、收藏 / 导入 / 下载图纸' },
+  { target: 'beads', text: '颜色功能区，点击颜色右侧 ⋯ 探索更多功能' },
+  { target: 'tools', text: '图纸具体的修改功能，可进行 DIY 绘制' },
+  { target: 'view', text: '切换不同视图，包括网格、放大缩小、全屏等' },
 ];
 
 /** 同一步的几个元素合成一个框；不在同一行的（手机上名字在图纸上方、按钮在底部）只取和最后一个同一行的 */
@@ -104,6 +104,13 @@ export function Guide({ replay = 0 }: { replay?: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, el, finish]);
 
+  // 当前亮的是哪块，挂在根元素上：样式里按它临时露出平时悬停才出现的东西（色号清单的「⋯」）
+  useEffect(() => {
+    if (step === null) return;
+    document.documentElement.dataset.guideStep = STEPS[step].target;
+    return () => { delete document.documentElement.dataset.guideStep; };
+  }, [step]);
+
   useEffect(() => {
     if (step === null) return;
     // 和常见的引导一样：→ ↓ 回车 空格 下一步，← ↑ 上一步，Esc 关掉（不用滚轮翻，触控板一碰就翻页）
@@ -124,7 +131,6 @@ export function Guide({ replay = 0 }: { replay?: number }) {
 
   if (step === null || !rect) return null;
   const last = step === STEPS.length - 1;
-  const touch = window.matchMedia('(pointer: coarse)').matches;
   const hole = { left: rect.left - PAD, top: rect.top - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 };
 
   // 说明卡放在亮框旁边：右边放得下放右边，否则左边，再不行放上下（手机）；都夹在屏幕里
@@ -150,11 +156,11 @@ export function Guide({ replay = 0 }: { replay?: number }) {
     <div className="guide" role="dialog" aria-modal="true" aria-label="新手引导" onClick={next}>
       <div className="guide-hole" style={hole} />
       <div className="guide-card" style={{ left, top, width: CARD_W }} key={step}>
-        <span className="guide-count">{step + 1} / {STEPS.length} · {touch ? '点任意处继续' : '点任意处或按 → 继续'}</span>
-        <p>{(touch && STEPS[step].touch) || STEPS[step].text}</p>
+        <span className="guide-count">{step + 1} / {STEPS.length}</span>
+        <p>{STEPS[step].text}</p>
         <div className="guide-actions">
           {!last && <button className="btn link small" onClick={e => { e.stopPropagation(); finish(); }}>跳过</button>}
-          <button className="btn primary pill small" autoFocus>{last ? '知道了' : '下一步'}</button>
+          <button className="btn primary pill small">{last ? '知道了' : '下一步'}</button>
         </div>
       </div>
     </div>,
