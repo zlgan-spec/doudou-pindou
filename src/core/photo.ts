@@ -279,6 +279,85 @@ function smoothCells(codes: (string | null)[], cols: number, rows: number, means
   return cur;
 }
 
+// 背景压平（好豆图的背景是几条干净的色带，比主体淡，不抢眼）：
+// 从图边往里长，相邻两格原图颜色差得很少就算一片（渐变的墙、天空、白桌面都能连起来），碰到轮廓、头发这类明显的边就停。
+// 这片占画面 10%–85% 才当背景：颜色收到 4 种以内，众数平滑两遍，6 颗以内的碎块并进周围
+const BG_STEP = 0.035, BG_MIN_SHARE = 0.1, BG_MAX_SHARE = 0.85, BG_COLORS = 4, BG_FRAGMENT = 6, BG_NEAR = 0.12;
+function findBackground(means: (Lab | null)[], cols: number, rows: number): Uint8Array | null {
+  // 只往「四周都平滑」的格子里长：毛发、条纹、草地这类有纹理的地方（多半是主体）挡住，主体贴着图边也不会被当成背景
+  const smooth = (x: number, y: number) => {
+    const m = means[y * cols + x]!;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      const n = nx >= 0 && ny >= 0 && nx < cols && ny < rows ? means[ny * cols + nx] : null;
+      if (n && matchDistance(m, n) >= BG_STEP) return false;
+    }
+    return true;
+  };
+  const bg = new Uint8Array(cols * rows);
+  const stack: number[] = [];
+  for (let x = 0; x < cols; x++) for (const y of [0, rows - 1]) { const i = y * cols + x; if (means[i] && !bg[i]) { bg[i] = 1; stack.push(i); } }
+  for (let y = 0; y < rows; y++) for (const x of [0, cols - 1]) { const i = y * cols + x; if (means[i] && !bg[i]) { bg[i] = 1; stack.push(i); } }
+  while (stack.length) {
+    const i = stack.pop()!, x = i % cols, y = (i - x) / cols;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+      const j = ny * cols + nx;
+      if (bg[j] || !means[j] || matchDistance(means[i]!, means[j]!) >= BG_STEP || !smooth(nx, ny)) continue;
+      bg[j] = 1;
+      stack.push(j);
+    }
+  }
+  const filled = means.filter(Boolean).length;
+  let n = 0;
+  for (let i = 0; i < bg.length; i++) n += bg[i];
+  return n >= filled * BG_MIN_SHARE && n <= filled * BG_MAX_SHARE ? bg : null;
+}
+
+function flattenBackground(codes: (string | null)[], bg: Uint8Array, cols: number, rows: number): (string | null)[] {
+  // 1. 背景里的颜色收到 BG_COLORS 种（只动背景格，主体用到的颜色不受影响）
+  // 只在相近的深浅之间合并（渐变压成色带）；差得远的不换：万一把贴着图边、很平滑的主体（手臂）也当成了背景，最多是被平滑一点，不会变色
+  const near = (a: string | null, b: string | null) => !!a && !!b && matchDistance(colorOf(a).lab, colorOf(b).lab) <= BG_NEAR;
+  const bgOnly = codes.map((c, i) => (bg[i] ? c : null));
+  const capped = capColors(bgOnly, BG_COLORS);
+  let out = codes.map((c, i) => (bg[i] && near(c, capped[i]) ? capped[i] : c));
+  // 2. 众数平滑：背景格换成周围 3×3 背景格里最多的颜色（够多才换），色带边缘不再犬牙交错
+  for (let pass = 0; pass < 2; pass++) {
+    const next = out.slice();
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+      const i = y * cols + x;
+      if (!bg[i] || !out[i]) continue;
+      const tally = new Map<string, number>();
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+        const j = ny * cols + nx;
+        if (bg[j] && out[j]) tally.set(out[j]!, (tally.get(out[j]!) ?? 0) + 1);
+      }
+      let top = out[i]!, tn = 0;
+      for (const [c, k] of tally) if (k > tn) [top, tn] = [c, k];
+      if (tn >= 5 && near(out[i], top)) next[i] = top;
+    }
+    out = next;
+  }
+  // 3. 背景里的小碎块并进周围
+  for (const region of connectedRegions({ width: cols, height: rows, cells: out }, (a, b) => a === b)) {
+    if (region.length > BG_FRAGMENT || !region.every(i => bg[i])) continue;
+    const inside = new Set(region), tally = new Map<string, number>();
+    for (const i of region) {
+      const x = i % cols, y = (i - x) / cols;
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+        const j = ny * cols + nx;
+        if (!inside.has(j) && bg[j] && out[j]) tally.set(out[j]!, (tally.get(out[j]!) ?? 0) + 1);
+      }
+    }
+    let top: string | null = null, tn = 0;
+    for (const [c, k] of tally) if (k > tn) [top, tn] = [c, k];
+    if (top && near(out[region[0]], top)) for (const i of region) out[i] = top;
+  }
+  return out;
+}
+
 export function generateFromPhoto(input: PhotoInput, options: PhotoOptions): Grid {
   const size = SIZES[options.size];
   const { image, mask } = input;
@@ -320,6 +399,8 @@ export function generateFromPhoto(input: PhotoInput, options: PhotoOptions): Gri
     codes = smoothCells(codes, cols, rows, means, protect);
     codes = mergeIsolated(codes, cols, rows);
     codes = mergeFragments(codes, cols, rows, means, protect);
+    const bg = findBackground(means, cols, rows);
+    if (bg) codes = flattenBackground(codes, bg, cols, rows);
     codes = mergeRareColors(codes, MIN_BEADS_PER_COLOR);
   }
 
