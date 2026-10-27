@@ -116,8 +116,9 @@ export function Guide({ replay = 0 }: { replay?: number }) {
     // 和常见的引导一样：→ ↓ 回车 空格 下一步，← ↑ 上一步，Esc 关掉（不用滚轮翻，触控板一碰就翻页）
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') return finish();
-      const onButton = e.target instanceof HTMLButtonElement; // 按钮上的回车、空格浏览器会自己点一下，这里再翻就翻两页
-      if (['ArrowRight', 'ArrowDown'].includes(e.key) || (!onButton && ['Enter', ' '].includes(e.key))) {
+      // 引导自己的按钮（跳过、下一步）上的回车、空格交给按钮；焦点留在别处（比如刚点过的「?」）时拦下来翻页，不让浏览器再点一次那个按钮
+      const onGuideButton = e.target instanceof HTMLButtonElement && !!e.target.closest('.guide');
+      if (['ArrowRight', 'ArrowDown'].includes(e.key) || (!onGuideButton && ['Enter', ' '].includes(e.key))) {
         e.preventDefault();
         next();
       } else if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
@@ -125,8 +126,8 @@ export function Guide({ replay = 0 }: { replay?: number }) {
         setStep(s => (s ? s - 1 : s));
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [step, finish, next]);
 
   if (step === null || !rect) return null;
