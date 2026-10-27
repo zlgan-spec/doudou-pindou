@@ -1168,7 +1168,8 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const base = Math.max(2, colorRange?.base ?? cur);
   // 多色版还在后台算（大图要一秒左右）：先按两倍算右半，滑块照样停在正中，算好再换成真的上限
   const top = Math.max(base, cur, colorRange ? (colorRange.rich ? richN : Math.min(MAX_COLORS, base * 2 - 2)) : 0);
-  const twoSided = top > base;
+  // 有原图时滑块总以刚生成的色数为中心；这张图实在加不出更好看的颜色时，右半段就停在原色数（宁可不加也不难看）
+  const twoSided = !!colorRange || top > base;
   // 滑块位置 0–100 ↔ 色数：两边都能调时左右各占一半，刚生成的色数在 50
   const toN = (p: number) => Math.round(!twoSided ? 2 + ((top - 2) * p) / 100 : p <= 50 ? 2 + ((base - 2) * p) / 50 : base + ((top - base) * (p - 50)) / 50);
   const toP = (n: number) => (!twoSided ? ((n - 2) / Math.max(1, top - 2)) * 100 : n <= base ? ((n - 2) / Math.max(1, base - 2)) * 50 : 50 + ((n - base) / (top - base)) * 50);

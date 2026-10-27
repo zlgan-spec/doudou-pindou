@@ -165,9 +165,17 @@ export function outlineGrid(grid: Grid, code: string): Grid {
   return changed ? { ...grid, cells: next } : grid;
 }
 
-/** 减少颜色：用量最少的颜色逐个并进最接近的颜色，直到只剩 n 色 */
+/**
+ * 减少颜色：先并「用量少、又和别的颜色很像」的，直到只剩 n 色。
+ * 眼睛、鼻子、高光这类关键细节的颜色不并（之前深灰的鼻子会被并进旁边鱼的棕色）；细节色太多时只保最多的几种，保证能减到 n
+ */
 export function reduceColors(grid: Grid, n: number): Grid {
-  const cells = capColors(grid.cells, Math.max(1, n));
+  const target = Math.max(1, n);
+  const keep = protectDetails(grid.cells, grid.width, grid.height);
+  const counts = new Map<string, number>();
+  keep.forEach((k, i) => { const c = grid.cells[i]; if (k && c) counts.set(c, (counts.get(c) ?? 0) + 1); });
+  const protect = new Set([...counts].sort((a, b) => b[1] - a[1]).slice(0, Math.max(0, target - 2)).map(([c]) => c));
+  const cells = capColors(grid.cells, target, protect);
   return cells === grid.cells ? grid : { ...grid, cells };
 }
 

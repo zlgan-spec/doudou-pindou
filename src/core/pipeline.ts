@@ -532,24 +532,93 @@ function flatRadius(options: PatternOptions): number {
   return options.fit && Math.max(options.fit.w, options.fit.h) > SIZES.large.board ? FLAT_RADIUS_BEYOND : FLAT_RADIUS[options.size];
 }
 
+// 多色版的把关：和刚生成的那张逐格比，大变样的格子不能超过 3%（颜色跳了：头上冒出淡紫色块、背景冒出灰斑），
+// 孤豆和碎块不能明显变多。只加明暗层次，不改画面
+const RICH_JUMP = 0.15, RICH_MAX_JUMP_SHARE = 0.03, RICH_NOISE_SLACK = 1.3;
+function noiseOf(g: Grid): number {
+  let n = 0;
+  for (const r of connectedRegions(g, (a, b) => a === b)) if (r.length <= 4) n++;
+  return n;
+}
+function passesRich(base: Grid, cand: Grid): boolean {
+  if (cand.width !== base.width || cand.height !== base.height) return false;
+  let jumps = 0, beads = 0;
+  for (let i = 0; i < base.cells.length; i++) {
+    const a = base.cells[i], b = cand.cells[i];
+    if (!a && !b) continue;
+    beads++;
+    if (!a || !b || matchDistance(colorOf(a).lab, colorOf(b).lab) > RICH_JUMP) jumps++;
+  }
+  return jumps <= beads * RICH_MAX_JUMP_SHARE && noiseOf(cand) <= noiseOf(base) * RICH_NOISE_SLACK + 5;
+}
+
 /**
- * 「颜色数量」往右用的多色版：同一张图尽量多分出颜色，最多 MAX_COLORS。
- * 照片：留住细碎的颜色（不清孤豆、不并零碎色）。卡通、像素画：按照片的办法逐格找最近色再出一份，摆法和刚生成的一样（留边、不铺满），
- * 往右拖图案不跳。2026-10-26 在 57 种卡通 × 尺寸上比过：它的颜色总比平涂按几档聚类半径各出一次取最多的那份多，还快几倍，那套就不再跑
+ * 刚生成的图上加明暗：逐格看原图（逐格最近色、不清理的那份），和这格原来的颜色是同一种（差得不多）就换成原图的深浅，
+ * 差得多就保持原样。色块的形状、轮廓、背景都不变，只是同一块里多出原图的明暗层次；
+ * 冒出来的零星单颗（上下左右都不是同一深浅）退回原色，不添杂点
+ */
+const SHADE_NEAR = 0.1;       // 卡通：同一种颜色只取很近的深浅
+const SHADE_NEAR_PHOTO = 0.14; // 照片本来就是连续的明暗，放宽一点
+const SHADE_MIN_PATCH = 4;
+function addShading(base: Grid, shades: Grid, near = SHADE_NEAR): Grid {
+  if (shades.width !== base.width || shades.height !== base.height) return base;
+  const { width: w, height: h } = base;
+  const out = base.cells.slice();
+  for (let i = 0; i < out.length; i++) {
+    const a = base.cells[i], b = shades.cells[i];
+    if (a && b && a !== b && matchDistance(colorOf(a).lab, colorOf(b).lab) <= near) out[i] = b;
+  }
+  // 新加的深浅要连成一小片（至少 SHADE_MIN_PATCH 颗）才留，零星几颗退回原色：加的是明暗层次，不是杂点
+  const clean = out.slice();
+  for (const region of connectedRegions({ width: w, height: h, cells: out }, (a, b) => a === b)) {
+    const i0 = region[0];
+    if (out[i0] === base.cells[i0] || region.length >= SHADE_MIN_PATCH) continue;
+    for (const i of region) clean[i] = base.cells[i];
+  }
+  // 新深浅把原来的色块切开后，会剩下一两颗夹在中间的原色：只并这种「被切出来的」小块（原来所在的色块比它大），
+  // 原图里本来就小的细节（蛋糕夹层、巧克力线、眼睛）不动
+  const baseSize = new Int32Array(w * h);
+  for (const r of connectedRegions(base, (a, b) => a === b)) for (const i of r) baseSize[i] = r.length;
+  const tidy = clean.slice();
+  for (const r of connectedRegions({ width: w, height: h, cells: clean }, (a, b) => a === b)) {
+    if (r.length >= SHADE_MIN_PATCH || !r.every(i => baseSize[i] > r.length)) continue;
+    const tally = new Map<string, number>();
+    for (const i of r) {
+      const x = i % w, y = (i - x) / w;
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const c = clean[ny * w + nx];
+        if (c && c !== clean[i]) tally.set(c, (tally.get(c) ?? 0) + 1);
+      }
+    }
+    let top: string | null = null, tn = 0;
+    for (const [c, n] of tally) if (n > tn) [top, tn] = [c, n];
+    if (top) for (const i of r) tidy[i] = top;
+  }
+  return { width: w, height: h, cells: mergeRareColors(tidy, MIN_BEADS_PER_COLOR) };
+}
+
+/**
+ * 「颜色数量」往右用的多色版：像换了大一号的豆板一样多出细节，但画面不变样。
+ * 都是在刚生成的图上按原图加明暗（见 addShading），再过一遍把关
  */
 export function generateRich(input: PatternInput, options: PatternOptions): Grid {
   const kind = resolveKind(input);
   const opts = { ...options, maxColors: MAX_COLORS };
   const photoInput = { image: input.image, mask: input.mask };
-  if (kind === 'photo') return generateFromPhoto(photoInput, { ...opts, keepShades: true });
+  const base = generatePattern({ ...input, kind }, options);
   const size = SIZES[options.size];
   const fit = options.fit ?? { w: size.maxSubject, h: size.maxSubject };
-  const shades = generateFromPhoto(photoInput, { ...opts, fit });
-  if (kind === 'flat') return shades;
-  // 像素画：本来就是按豆子画好的，清理后颜色常常又回到原样，碎色也留着，至少往右还能加
-  const pixel = generatePattern({ ...input, kind }, opts);
-  const raw = generateFromPhoto(photoInput, { ...opts, fit, keepShades: true });
-  return [pixel, shades, raw].reduce((a, b) => (legendOf(b).length > legendOf(a).length ? b : a));
+  // 照片也走「在刚生成的图上加明暗」：直接换成色数更多的那份，会冒出原图里零星的怪色（蛋糕上的淡绿、淡粉）
+  const candidates = kind === 'photo'
+    ? [addShading(base, generateFromPhoto(photoInput, opts), SHADE_NEAR_PHOTO), addShading(base, generateFromPhoto(photoInput, { ...opts, keepShades: true }), SHADE_NEAR_PHOTO)]
+    : [addShading(base, generateFromPhoto(photoInput, { ...opts, fit, keepShades: true }))];
+  let best = base, most = legendOf(base).length;
+  for (const c of candidates) {
+    const n = legendOf(c).length;
+    if (n > most && passesRich(base, c)) [best, most] = [c, n];
+  }
+  return best;
 }
 
 export function generatePattern(input: PatternInput, options: PatternOptions): Grid {
