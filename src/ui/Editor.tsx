@@ -1174,6 +1174,8 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const top = Math.max(base, cur, colorRange ? (colorRange.rich ? richN : Math.min(MAX_COLORS, base * 2 - 2)) : 0);
   // 有原图时滑块总以刚生成的色数为中心；这张图实在加不出更好看的颜色时，右半段就停在原色数（宁可不加也不难看）
   const twoSided = !!colorRange || top > base;
+  // 多色版算好了、却一种颜色也加不出来：右半段变灰、拖不过中间，一看就知道已经最多了，不会以为坏了
+  const capped = !!colorRange?.rich && top <= base;
   // 滑块位置 0–100 ↔ 色数：两边都能调时左右各占一半，刚生成的色数在 50
   const toN = (p: number) => Math.round(!twoSided ? 2 + ((top - 2) * p) / 100 : p <= 50 ? 2 + ((base - 2) * p) / 50 : base + ((top - base) * (p - 50)) / 50);
   const toP = (n: number) => (!twoSided ? ((n - 2) / Math.max(1, top - 2)) * 100 : n <= base ? ((n - 2) / Math.max(1, base - 2)) * 50 : 50 + ((n - base) / (top - base)) * 50);
@@ -1750,9 +1752,9 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
             )}
             {mergeOpen && (
               <>
-                <div className="bead-range">
+                <div className={`bead-range ${capped ? 'capped' : ''}`}>
                   <input type="range" min={0} max={100} value={toP(targetN)} disabled={busy} aria-label="颜色数量"
-                    onChange={e => setTarget(toN(Number(e.target.value)))} onPointerUp={commitColors} onKeyUp={commitColors} />
+                    onChange={e => setTarget(toN(capped ? Math.min(50, Number(e.target.value)) : Number(e.target.value)))} onPointerUp={commitColors} onKeyUp={commitColors} />
                 </div>
                 {merged && <p className="bead-merge-note">原来 {merged.from} 色<button className="btn link small" onClick={undoMerge}>撤销</button></p>}
               </>

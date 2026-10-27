@@ -489,6 +489,9 @@ a { color: inherit; }
 .bead-merge-note .btn { padding: 0; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 .bead-merge-hint { margin: -2px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
 .bead-merge input[type='range'] { width: 100%; accent-color: var(--ink); }
+/* 这张图加不出更多颜色：右半段轨道盖一层底色变淡（从滑块圆点右边开始，不压圆点） */
+.bead-range { position: relative; }
+.bead-range.capped::after { content: ''; position: absolute; top: 0; bottom: 0; left: calc(50% + 9px); right: 0; background: var(--bg); opacity: 0.7; pointer-events: none; }
 /* 滑块下面的小刻度：黑色 = 现在的色数，灰色 = 这块板的建议上限 */
 .bead-more { width: 24px; height: 28px; border: 0; border-radius: 999px; background: none; color: var(--muted); opacity: 0; transition: opacity 0.15s, background 0.15s; }
 .bead-list li:hover .bead-more, .bead-more:focus-visible { opacity: 1; }
