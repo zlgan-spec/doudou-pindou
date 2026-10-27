@@ -806,25 +806,29 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     return [((clientX - r.left) * natural.width / r.width - natural.gridX) / natural.cell, ((clientY - r.top) * natural.height / r.height - natural.gridY) / natural.cell];
   };
   const onHandleDown = (e: ReactPointerEvent<HTMLElement>, corner: Corner | 'move' | 'rotate') => {
-    if (!float) return;
+    // 刚框好的选区也直接能拖角缩放：按下角时才把内容浮起来（和按住选区拖动一样）
+    const lifted = !float && sel ? lift(sel, sel) : null;
+    const f = float ?? lifted;
+    if (!f) return;
+    if (lifted) setFloat(lifted);
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     setHandleDragging(true);
     const [px, py] = cellAt(e.clientX, e.clientY);
     if (corner === 'move') {
-      handleDrag.current = { mode: 'move', sx: px, sy: py, x0: float.x, y0: float.y };
+      handleDrag.current = { mode: 'move', sx: px, sy: py, x0: f.x, y0: f.y };
       return;
     }
-    if (float.text) {
-      const [cx, cy] = floatCenter(float);
+    if (f.text) {
+      const [cx, cy] = floatCenter(f);
       handleDrag.current = corner === 'rotate'
-        ? { mode: 'rotate', cx, cy, a0: float.text.angle, p0: Math.atan2(py - cy, px - cx) }
-        : { mode: 'textScale', cx, cy, s0: float.scale, d0: Math.max(0.5, Math.hypot(px - cx, py - cy)) };
+        ? { mode: 'rotate', cx, cy, a0: f.text.angle, p0: Math.atan2(py - cy, px - cx) }
+        : { mode: 'textScale', cx, cy, s0: f.scale, d0: Math.max(0.5, Math.hypot(px - cx, py - cy)) };
       return;
     }
     if (corner === 'rotate') return;
     const fixed: Corner = ({ tl: 'br', tr: 'bl', bl: 'tr', br: 'tl' } as const)[corner];
-    handleDrag.current = { mode: 'scale', fixed, fx: fixed === 'tl' || fixed === 'bl' ? float.x : float.x + float.w, fy: fixed === 'tl' || fixed === 'tr' ? float.y : float.y + float.h };
+    handleDrag.current = { mode: 'scale', fixed, fx: fixed === 'tl' || fixed === 'bl' ? f.x : f.x + f.w, fy: fixed === 'tl' || fixed === 'tr' ? f.y : f.y + f.h };
   };
   const onHandleMove = (e: ReactPointerEvent<HTMLElement>) => {
     const d = handleDrag.current;
@@ -1501,16 +1505,17 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
           <canvas ref={canvasRef} className={`sheet ${editing ? 'editing' : ''} ${penMode ? 'pen-mode' : ''}`} style={sheetStyle} aria-label="拼豆图纸" />
           <canvas ref={detailRef} className="sheet-detail" style={detailStyle} aria-hidden />
           <canvas ref={overlayRef} className={`sheet-overlay ${editing ? '' : 'hidden'}`} />
-          {tool === 'select' && float && !selDragging && fit && (() => {
+          {tool === 'select' && (float || sel) && !selDragging && fit && (() => {
             const k = (fit.w * zoom) / natural.width;
-            const style = { left: (natural.gridX + float.x * natural.cell) * k, top: (natural.gridY + float.y * natural.cell) * k, width: float.w * natural.cell * k, height: float.h * natural.cell * k };
+            const box = float ? floatRect(float) : sel!; // 刚框好的选区也有四个角，拖角直接缩放
+            const style = { left: (natural.gridX + box.x * natural.cell) * k, top: (natural.gridY + box.y * natural.cell) * k, width: box.w * natural.cell * k, height: box.h * natural.cell * k };
             const handle = (c: Corner | 'move' | 'rotate') => ({ onPointerDown: (e: ReactPointerEvent<HTMLElement>) => onHandleDown(e, c), onPointerMove: onHandleMove, onPointerUp: onHandleUp, onPointerCancel: onHandleUp });
             return (
               <div className="float-box" style={style}>
                 {(['tl', 'tr', 'bl', 'br'] as const).map(c => <span key={c} className={`fh ${c}`} title="拖动等比放大缩小" {...handle(c)} />)}
-                <span className="fh-move" title="拖动移动" {...handle('move')}>{ICON.move}</span>
-                {float.text && <span className="fh-rot" title="拖动旋转（按住 Shift 每 15° 一档）" {...handle('rotate')} />}
-                {(float.scale !== 1 || float.text?.angle) && (
+                {float && <span className="fh-move" title="拖动移动" {...handle('move')}>{ICON.move}</span>}
+                {float?.text && <span className="fh-rot" title="拖动旋转（按住 Shift 每 15° 一档）" {...handle('rotate')} />}
+                {float && (float.scale !== 1 || float.text?.angle) && (
                   <em className="fh-scale">{float.w}×{float.h} 颗{float.text?.angle ? ` · ${Math.round(float.text.angle / DEG)}°` : ''}</em>
                 )}
               </div>
