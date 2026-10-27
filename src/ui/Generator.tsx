@@ -84,6 +84,8 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
   // 当前图纸在"我的收藏"里的 id：只有用户点了收藏才有；收藏后的编辑自动跟着存
   const [patternId, setPatternId] = useState<string | null>(opened?.id || null); // 图纸库打开的 id 为空：还没收藏
   const [docName, setDocName] = useState(opened?.name && opened.name !== '未命名' ? opened.name : ''); // 空 = 还没起名，不用文件名
+  // 从图纸库打开时的原样：没改过就还是图纸库那张
+  const libOriginal = useRef(opened && !opened.id && opened.libId ? history?.present : undefined);
   const stage = useRef<HTMLElement>(null);
   useEffect(warmUp, []);
 
@@ -107,6 +109,8 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
   useEffect(() => {
     if (!history) return;
     if (patternId) return clearDraft();
+    // 图纸库原样打开、还没动过的不算草稿：再去图纸库点别的，不用问「会被替换」（打开它时已经确认过替换旧草稿）
+    if (libOriginal.current && history.present === libOriginal.current) return clearDraft();
     const doc = history.present;
     const save = () => {
       pendingDraft.current = null;
@@ -153,7 +157,8 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     const doc = history.present;
     const save = () => {
       pendingStore.current = null;
-      const ok = updatePattern(patternId, { grid: doc.grid, mirrored: doc.mirrored, name: docName.trim() || '未命名' });
+      // 尺寸、占满整板也跟着存：收藏后换豆板重新生成，收藏里是新的这份
+      const ok = updatePattern(patternId, { grid: doc.grid, mirrored: doc.mirrored, name: docName.trim() || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', fullBoard });
       setError(ok ? '' : '浏览器空间满了，刚才的修改没存进收藏。到「我的收藏」删掉几张，或先导出备份。');
     };
     pendingStore.current = save;
@@ -162,11 +167,10 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       window.clearTimeout(timer);
       pendingStore.current = null;
     };
-  }, [history, patternId, docName]);
+  }, [history, patternId, docName, fullBoard]);
 
   // 从图纸库打开、之前已经收藏过的：图纸没改时按钮显示「已收藏」，点了是取消那份收藏；
   // 改过就是新的一份，按钮回到「收藏」，点了另存一份，不覆盖收藏里那份（那份可能是之前改过的）
-  const libOriginal = useRef(opened && !opened.id && opened.libId ? history?.present : undefined);
   const findLibStarred = () => (opened?.libId ? listPatterns().find(e => e.libId === opened.libId) : undefined);
   const [libStarred, setLibStarred] = useState(() => !!libOriginal.current && !!findLibStarred());
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,7 +200,8 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     void generateInBackground(last.input, last.options, true).then(grid => setRich({ genId: at, grid }));
   };
 
-  const generate = useCallback(async (src: Source, sz: Sizing, styleId: StyleId, bg: boolean): Promise<void> => {
+  // again = 同一张原图换尺寸 / 抠图重新生成：还是这张图纸，名字和收藏都留着（收藏跟着换成新生成的）
+  const generate = useCallback(async (src: Source, sz: Sizing, styleId: StyleId, bg: boolean, again = false): Promise<void> => {
     const id = ++requestId.current;
     setBusy(true);
     setError('');
@@ -259,8 +264,10 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       setFullBoard(full);
       setGenId(n => n + 1);
       setBaseColors(legendOf(grid).length);
-      setDocName(''); // 文件名常常是一串乱码，不拿来当名字；用户在顶栏或收藏时再起
-      setPatternId(null); // 新生成的图纸还没收藏
+      if (!again) {
+        setDocName(''); // 文件名常常是一串乱码，不拿来当名字；用户在顶栏或收藏时再起
+        setPatternId(null); // 新图片生成的图纸还没收藏
+      }
       const b = contentBounds(grid);
       const longSide = b ? Math.max(b.right - b.left, b.bottom - b.top) + 1 : 0;
       const shortSide = b ? Math.min(b.right - b.left, b.bottom - b.top) + 1 : 0;
@@ -300,7 +307,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       return;
     }
     lastOptions.current = { sizing, style, removeBg };
-    void generate(source, sizing, style, removeBg);
+    void generate(source, sizing, style, removeBg, true);
   }, [sizing, style, removeBg, source, history, edited, generate]);
 
   const openFile = async (file: File | undefined, asked = false) => {
@@ -426,11 +433,30 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       if (mine && window.confirm(`取消收藏「${mine.name}」？取消后找不回来。`)) deletePattern(mine.id);
       return;
     }
+    addToStore(nameNow);
+  };
+  const addToStore = (nameNow: string) => {
+    if (!history) return;
     const doc = history.present;
     const id = createPattern({ name: nameNow || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, tags: opened?.tags, libId: opened?.libId });
     if (!id) setError('浏览器空间满了，收藏不进去。到「我的收藏」删掉几张，或先导出备份。');
     setPatternId(id);
   };
+  // 手动起了名就是想留着：没收藏的顺手收进「我的收藏」，之后改名、改图都跟着存
+  // 图纸库原样打开、收藏里已有一份时先不收（那份还在），等改了图变成新的一份再收
+  const renamedOnLib = useRef(false);
+  const rename = (n: string) => {
+    setDocName(n);
+    if (patternId || !n.trim()) return;
+    if (showLibStarred) renamedOnLib.current = true;
+    else addToStore(n.trim());
+  };
+  useEffect(() => {
+    if (!renamedOnLib.current || showLibStarred || patternId || !docName.trim()) return;
+    renamedOnLib.current = false;
+    addToStore(docName.trim());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showLibStarred]);
 
   const fileInputEl = (
     <input
@@ -534,7 +560,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
               colorRange={source && lastInput.current ? { base: baseColors, rich: rich?.genId === genId ? rich.grid : null, onOpen: requestRich } : undefined}
               sizing={source ? { value: sizing, onChange: setSizing, aspect } : undefined}
               name={docName}
-              onRename={setDocName}
+              onRename={rename}
             />
           ) : (
             <div className="empty"><p>{busy ? progress : ' '}</p></div>
