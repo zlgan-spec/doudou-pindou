@@ -7,6 +7,7 @@ import { MAX_COLORS, SIZES, boardFor, boardTiles, type SizeId, type StyleId } fr
 import { commit, copySpot, denoise, fillRect, fitOnBoard, fillRegion, growToFit, mirrorGrid, mirrorRect, outlineGrid, paintCells, redo, reduceColors, replaceColor, undo, type History, type Rect } from '../core/edit';
 import { legendOf, type Grid } from '../core/grid';
 import { colorOf } from '../core/palette';
+import { scaleCells } from '../core/scale';
 import { boardName, hitCell, hitLegend, renderSheet, renderSheetDiff, sheetLayout, sheetLogoReady } from '../render/sheet';
 import { Logo } from './Logo';
 import { Guide } from './Guide';
@@ -122,15 +123,9 @@ function snapAngle(a: number, shift: boolean): number {
   return Math.abs(a - near) < 4 * DEG ? near : a;
 }
 
-/** 按倍数等比放大缩小：每个新格子取原图对应位置的那颗（最近邻），不会糊成杂色 */
+/** 按倍数等比放大缩小：按像素画的规矩（整数倍直接复制；缩小时细线、眼睛不丢，同样大的眼睛缩完一样大），见 core/scale.ts */
 function buildFloat(base: (string | null)[], bw: number, bh: number, scale: number) {
-  const sw = Math.max(1, Math.round(bw * scale)), sh = Math.max(1, Math.round(bh * scale));
-  const up: (string | null)[] = new Array(sw * sh);
-  for (let y = 0; y < sh; y++) {
-    const by = Math.min(bh - 1, Math.floor((y * bh) / sh));
-    for (let x = 0; x < sw; x++) up[y * sw + x] = base[by * bw + Math.min(bw - 1, Math.floor((x * bw) / sw))];
-  }
-  return { cells: up, w: sw, h: sh };
+  return scaleCells(base, bw, bh, scale);
 }
 function makeFloat(base: (string | null)[], bw: number, bh: number, scale: number, x: number, y: number, cut: Rect | null): Floating {
   return { ...buildFloat(base, bw, bh, scale), base, bw, bh, scale, x, y, cut };

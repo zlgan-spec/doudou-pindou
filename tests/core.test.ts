@@ -425,3 +425,28 @@ describe('没有原图时换豆板：图案原样换板', () => {
     expect(small.cells.filter(Boolean).length).toBeGreaterThan(2000);
   });
 });
+
+describe('等比缩放（选区）', () => {
+  it('整数倍放大：一颗变成 k×k 颗', async () => {
+    const { scaleCells } = await import('../src/core/scale');
+    const r = scaleCells(['H7', 'A1', 'A1', 'H7'], 2, 2, 2);
+    expect([r.w, r.h]).toEqual([4, 4]);
+    expect(r.cells.slice(0, 4)).toEqual(['H7', 'H7', 'A1', 'A1']);
+  });
+
+  it('缩小一半：一样大的两只眼睛缩完一样大，不会被跳掉', async () => {
+    const { scaleCells } = await import('../src/core/scale');
+    const W = 20, H = 10;
+    const cells = Array.from({ length: W * H }, (_, i) => {
+      const x = i % W, y = (i - x) / W;
+      const eye = y >= 3 && y < 6 && ((x >= 3 && x < 6) || (x >= 12 && x < 15)); // 3×3 的眼睛，一只压在格线上
+      return eye ? 'H7' : 'F18';
+    });
+    const r = scaleCells(cells, W, H, 0.5);
+    const eyes: number[][] = [];
+    r.cells.forEach((c, i) => { if (c === 'H7') eyes.push([i % r.w, Math.floor(i / r.w)]); });
+    const left = eyes.filter(([x]) => x < r.w / 2).length, right = eyes.filter(([x]) => x >= r.w / 2).length;
+    expect(left).toBeGreaterThan(0);
+    expect(left).toBe(right);
+  });
+});
