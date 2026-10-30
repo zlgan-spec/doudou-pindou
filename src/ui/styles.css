@@ -77,7 +77,8 @@ a { color: inherit; }
 .center { text-align: center; }
 
 /* ---------- 顶栏：品牌 | 胶囊导航 | GitHub ---------- */
-.topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--line); }
+/* 顶栏不透明：半透明 + 毛玻璃在有的浏览器里不生效，滚到下面的工具栏、色号清单会透出来和导航叠在一起 */
+.topbar { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
 .app { overflow-x: clip; } /* 边框交点的小方块在窄屏时会探出半个，裁掉免得出横向滚动条（clip 不影响吸顶） */
 .topbar-in { max-width: var(--frame); margin: 0 auto; height: 64px; padding: 0 calc(var(--gutter) + 1px); /* +1 = 下面页面外框竖线的宽度，标志和页脚标志对齐 */ display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 16px; } /* 左边导航不让挤；右边剩多少用多少，放不下时图纸名先变窄 */
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; text-decoration: none; color: var(--ink); justify-self: start; }
@@ -707,7 +708,6 @@ a { color: inherit; }
   .topbar .crumb-sep { display: none; } /* 手机上只留图标 + 链接 */
   .nav-links a { padding: 6px 8px; }
   .topbar .github { padding: 0; width: 36px; height: 36px; justify-content: center; font-size: 0; gap: 0; } /* 手机上只留图标 */
-  .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg); } /* 毛玻璃会让底部固定按钮跟着顶栏走，手机上用实底 */
   .app:has(.page-actions:not(:empty)) .frame { padding-bottom: 76px; } /* 给底部的收藏 / 导入 / 导出留位置，不盖住最后几行 */
   .page-actions:not(:empty) { position: fixed; left: 50%; bottom: 14px; z-index: 30; transform: translateX(-50%); margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.35); }
   .adjust-pop { top: 70px; left: 8px; }
