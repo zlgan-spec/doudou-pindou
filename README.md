@@ -58,6 +58,7 @@ npm test
 ## 参与贡献
 
 - 发现问题或有建议：[提一个 Issue](https://github.com/zlgan-spec/doudou-pindou/issues/new/choose)
+- 想看成品和交流拼法：[小红书帖子](https://www.xiaohongshu.com/discovery/item/6aebff25000000001100dc06?source=webshare&xhsshare=pc_web&xsec_token=ABLCB1g0ipS2bmQwz5p3kYfQLf8k1pPDQ85kDi30lfs_0=&xsec_source=pc_share)，欢迎二创
 - 想投稿图纸或参与开发：看 [CONTRIBUTING.md](CONTRIBUTING.md)
 - 认为某张图纸侵犯了你的权益：用「图纸版权申诉」模板提 Issue，核实后会尽快移除
 

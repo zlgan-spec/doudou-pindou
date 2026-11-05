@@ -60,6 +60,7 @@ npm test
 ## Contributing
 
 - Bugs and ideas: [open an issue](https://github.com/zlgan-spec/doudou-pindou/issues/new/choose)
+- Finished pieces and discussion: [post on Xiaohongshu](https://www.xiaohongshu.com/discovery/item/6aebff25000000001100dc06?source=webshare&xhsshare=pc_web&xsec_token=ABLCB1g0ipS2bmQwz5p3kYfQLf8k1pPDQ85kDi30lfs_0=&xsec_source=pc_share) (Chinese); remixes welcome
 - Submitting patterns or code: see [CONTRIBUTING.md](CONTRIBUTING.md) (Chinese)
 - Copyright concerns about a pattern: use the "copyright" issue template and it will be reviewed and removed if confirmed
 
