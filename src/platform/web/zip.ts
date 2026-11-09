@@ -1,5 +1,5 @@
 // 打一个 zip 包（只存不压：里面都是 PNG，本来就压缩过）。大图下载用：一张总览 + 每块板一张
-import { crc32 } from './pngData';
+import { crc32 } from '../../ui/pngData';
 
 export function makeZip(files: Array<{ name: string; data: Uint8Array<ArrayBuffer> }>): Blob {
   const enc = new TextEncoder();

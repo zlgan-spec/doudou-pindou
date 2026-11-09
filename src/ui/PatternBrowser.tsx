@@ -1,11 +1,14 @@
 // 图纸库和我的收藏共用的浏览方式（照着色卡库）：搜索框 + 一排标签 + 缩略图网格，点图放大看整张图纸，旁边一键下载。
 // 图纸库：顶上一排按系列筛；「全部」里同一个系列的图纸放在一起、每个系列另起一行，卡片只放图。
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { ScrollBar } from './ScrollBar';
 import { SIZES, boardLabel, type SizeId, type StyleId } from '../core/config';
 import { beadCount, legendOf, type Grid } from '../core/grid';
 import { renderSheet, sheetLayout } from '../render/sheet';
 import { CATEGORY_TAGS, DETAIL_TAGS, sizeOf, USE_TAGS } from './library';
-import { embedPattern, sheetFileName } from './pngData';
+import { platform } from '@platform';
+import { setToastHost } from './NoteToast';
+import { embedPatternDataUrl, sheetFileName } from './pngData';
 
 export interface BrowserItem {
   id: string;
@@ -35,17 +38,19 @@ function sizeLabel(grid: Grid): string | null {
   return s ? SIZES[s].label : null;
 }
 
-/** 下载整张图纸，PNG 里带着格子表格，拖回做拼豆页能接着改 */
+/** 保存整张图纸（网站版下载、小工具版存相册），PNG 里带着格子表格，拿回做豆图能接着改 */
 export function downloadSheet(p: { name: string; grid: Grid; mirrored: boolean; size?: SizeId; style?: StyleId; fullBoard?: boolean }) {
-  renderSheet(p.grid, { mirrored: p.mirrored, scale: p.grid.width > 80 ? 1.5 : 2, title: p.name }).toBlob(async raw => {
-    if (!raw) return;
-    const blob = await embedPattern(raw, { name: p.name, size: p.size ?? sizeOf(p.grid) ?? 'small', style: p.style ?? 'sticker', fullBoard: p.fullBoard ?? false, mirrored: p.mirrored, grid: p.grid });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = sheetFileName(p.name, p.mirrored);
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }, 'image/png');
+  void platform.exportSheet({
+    title: p.name,
+    fileName: sheetFileName(p.name, p.mirrored),
+    build: codes => [{
+      name: sheetFileName(p.name, p.mirrored),
+      url: embedPatternDataUrl(
+        renderSheet(p.grid, { mirrored: p.mirrored, scale: platform.exportScale(p.grid), title: p.name, codes }).toDataURL('image/png'),
+        { name: p.name, size: p.size ?? sizeOf(p.grid) ?? 'small', style: p.style ?? 'sticker', fullBoard: p.fullBoard ?? false, mirrored: p.mirrored, grid: p.grid },
+      ),
+    }],
+  });
 }
 
 /** 图纸库的一个系列，我的收藏没有 */
@@ -76,6 +81,7 @@ function Card({ item, i, bare, onOpen }: { item: BrowserItem; i: number; bare: b
 }
 
 export function PatternBrowser({ items, actions, series = [], blocks: allBlocks }: Props) {
+  const chipsRef = useRef<HTMLDivElement>(null);
   const library = series.length > 0;
   const [query, setQuery] = useState('');
   // 图纸库：选系列或豆板；我的收藏：选标签。旧的系列网址打开时直接选中那个系列
@@ -124,13 +130,16 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder={library ? '搜名字或系列，如 猫咪、货币' : '搜名字或标签，如 猫咪、杯垫'} maxLength={20} aria-label="搜索图纸" />
         </label>
         {chips.length > 2 && (
-          <div className="chips" role="tablist" aria-label={library ? '系列' : '标签'}>
-            {chips.map(c => (
-              <button key={c.name} role="tab" aria-selected={tag === c.name} className={tag === c.name ? 'on' : ''} onClick={() => setTag(c.name)}>
-                {c.name}<small>{c.n}</small>
-              </button>
-            ))}
-          </div>
+          <>
+            <ScrollBar target={chipsRef} axis="x" deps={[chips.length]} />
+            <div className="chips" ref={chipsRef} role="tablist" aria-label={library ? '系列' : '标签'}>
+              {chips.map(c => (
+                <button key={c.name} role="tab" aria-selected={tag === c.name} className={tag === c.name ? 'on' : ''} onClick={() => setTag(c.name)}>
+                  {c.name}<small>{c.n}</small>
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -285,6 +294,8 @@ function SheetStage({ item }: { item: BrowserItem }) {
 
   return (
     <div className="viewer-stage">
+      <ScrollBar target={box} axis="x" inside deps={[zoom]} />
+      <ScrollBar target={box} axis="y" deps={[zoom]} />
       <div
         ref={box}
         className={`viewer-sheet ${zoom > 1 ? 'zoomed' : ''}`}
@@ -317,6 +328,9 @@ function Viewer({ item, actions, onClose, onStep }: { item: BrowserItem; actions
 
   useEffect(() => {
     dialog.current?.showModal();
+    (document.activeElement as HTMLElement | null)?.blur(); // 不让浏览器自动把焦点放到第一个按钮上
+    setToastHost(dialog.current); // 存相册的提示条要渲染进这个模态窗口里
+    return () => setToastHost(null);
   }, []);
   const stepRef = useRef(onStep);
   stepRef.current = onStep;
@@ -326,8 +340,9 @@ function Viewer({ item, actions, onClose, onStep }: { item: BrowserItem; actions
   fullRef.current = full;
   const setFullScreen = useCallback((on: boolean) => {
     setFull(on);
-    if (on) document.documentElement.requestFullscreen?.().catch(() => { /* 不支持就只铺满窗口 */ });
-    else if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    // 没有真全屏的渠道（小工具由容器管）只把图纸区铺满窗口
+    if (on) platform.fullscreen?.enter();
+    else platform.fullscreen?.exit();
   }, []);
   useEffect(() => {
     const onChange = () => { if (!document.fullscreenElement) setFull(false); }; // 浏览器自己按 Esc 退出的
@@ -394,7 +409,7 @@ function Viewer({ item, actions, onClose, onStep }: { item: BrowserItem; actions
           {item.credit && <div><dt>出处</dt><dd>{item.credit}</dd></div>}
         </dl>
         <div className="viewer-actions">{actions(item, () => dialog.current?.close())}</div>
-        <p className="fine">下载的 PNG 拖回「做豆图」就能接着改</p>
+        <p className="fine">{platform.copy.viewerHint}</p>
       </aside>
     </dialog>
   );

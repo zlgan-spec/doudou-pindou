@@ -1,7 +1,8 @@
-// 原图对照小窗：浮在图纸区上，可拖动、拖右下角缩放、「—」收起成小标签、「×」关闭；位置大小记在浏览器里。
+// 原图对照小窗：浮在图纸区上，单指按住任意位置拖动、双指捏合放大缩小（电脑上也能拖右下角缩放）、「—」收起成小标签、「×」关闭；位置大小记在浏览器里。
 // 和图纸联动：鼠标在哪一格，原图上就用一颗豆大小的黑框标出那一格（主角，精确到格）；
 // 图纸放大后，再用细淡的框标出屏幕上看到的整块范围（像 Photoshop 导航器的视野框，屏幕大框就大，只作辅助）。
 // 只显示原图里出图的那部分（和图纸一一对应），镜像版跟着左右翻。
+import { platform } from '@platform';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Reference } from './Editor';
 
@@ -28,7 +29,7 @@ interface Saved { x: number; y: number; w: number; min: boolean }
 
 function load(): Saved | null {
   try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Saved> | null;
+    const v = JSON.parse(platform.storage.getItem(KEY) ?? 'null') as Partial<Saved> | null;
     if (!v || ![v.x, v.y, v.w].every(n => typeof n === 'number' && Number.isFinite(n))) return null;
     return { x: v.x!, y: v.y!, w: Math.max(MIN_W, v.w!), min: v.min === true };
   } catch {
@@ -44,7 +45,7 @@ export function RefWindow({ reference, mirrored, gridWidth, visibleCells, viewEl
   const [view, setView] = useState<CellRect | null>(null);
 
   useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* 存不下就算了 */ }
+    try { platform.storage.setItem(KEY, JSON.stringify(state)); } catch { /* 存不下就算了 */ }
   }, [state]);
 
   // 第一次打开：放到图纸区右上角
@@ -129,6 +130,47 @@ export function RefWindow({ reference, mirrored, gridWidth, visibleCells, viewEl
     drag.current = null;
   };
 
+  // 手机：整个小窗都能拖（单指），双指捏合按两指中点等比放大缩小；按钮和右下角缩放柄照常
+  const fingers = useRef(new Map<number, [number, number]>());
+  const pinch = useRef<null | { dist: number; w: number; cx: number; cy: number }>(null);
+  const winDown = (e: ReactPointerEvent<HTMLElement>) => {
+    if ((e.target as HTMLElement).closest('button, .ref-size')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    fingers.current.set(e.pointerId, [e.clientX, e.clientY]);
+    if (fingers.current.size === 1) {
+      drag.current = { mode: 'move', sx: e.clientX, sy: e.clientY, x: state.x, y: state.y, w: state.w };
+    } else if (fingers.current.size === 2) {
+      drag.current = null;
+      const [a, b] = [...fingers.current.values()];
+      const hh = Math.round(state.w * ratio);
+      pinch.current = { dist: Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])), w: state.w, cx: state.x + state.w / 2, cy: state.y + hh / 2 };
+    }
+  };
+  const winMove = (e: ReactPointerEvent<HTMLElement>) => {
+    if (!fingers.current.has(e.pointerId)) return;
+    fingers.current.set(e.pointerId, [e.clientX, e.clientY]);
+    const p = pinch.current, parent = root.current?.parentElement;
+    if (p && fingers.current.size >= 2 && parent) {
+      const [a, b] = [...fingers.current.values()];
+      const nw = Math.round(Math.min(Math.max(MIN_W, p.w * Math.hypot(a[0] - b[0], a[1] - b[1]) / p.dist), parent.clientWidth));
+      const nh = Math.round(nw * ratio) + (root.current!.offsetHeight - Math.round(state.w * ratio)); // 加上标题栏
+      setState(s => ({ ...s, w: nw, x: Math.min(Math.max(0, p.cx - nw / 2), parent.clientWidth - nw), y: Math.min(Math.max(0, p.cy - nh / 2), Math.max(0, parent.clientHeight - nh)) }));
+      return;
+    }
+    move(e);
+  };
+  const winUp = (e: ReactPointerEvent<HTMLElement>) => {
+    fingers.current.delete(e.pointerId);
+    if (fingers.current.size < 2) pinch.current = null;
+    if (fingers.current.size === 1) {
+      // 捏完剩一根手指：从它现在的位置接着拖，不跳
+      const [[x, y]] = [...fingers.current.values()];
+      drag.current = { mode: 'move', sx: x, sy: y, x: state.x, y: state.y, w: state.w };
+      return;
+    }
+    up(e);
+  };
+
   if (state.min) {
     return (
       <div ref={root} className="ref-win min" style={{ left: Math.max(0, state.x), top: state.y }}>
@@ -149,8 +191,9 @@ export function RefWindow({ reference, mirrored, gridWidth, visibleCells, viewEl
   const mw = Math.max(6, cellW), mh = Math.max(6, cellH);
 
   return (
-    <div ref={root} className="ref-win" style={{ left: Math.max(0, state.x), top: state.y, width: w }} role="dialog" aria-label="原图对照">
-      <div className="ref-head" onPointerDown={down('move')} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+    <div ref={root} className="ref-win" style={{ left: Math.max(0, state.x), top: state.y, width: w }} role="dialog" aria-label="原图对照"
+      onPointerDown={winDown} onPointerMove={winMove} onPointerUp={winUp} onPointerCancel={winUp}>
+      <div className="ref-head">
         <span>原图</span>
         <button onClick={() => setState(s => ({ ...s, min: true }))} aria-label="收起原图" title="收起">—</button>
         <button onClick={onClose} aria-label="关闭原图对照" title="关闭">×</button>

@@ -1,4 +1,5 @@
 // 上传卡片：首页和做拼豆页共用，卡片放在一块"豆板"上。只留一句话和一个按钮；做拼豆页在卡片顶部放豆板尺寸。
+import { platform } from '@platform';
 import { useId, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react';
 import { ARROW_BODY, ARROW_HEAD, ARROW_LINE } from './brushArrow';
 import { Logo } from './Logo';
@@ -43,7 +44,8 @@ export function UploadCard({ onFile, busy = false, progress = '', hero = false, 
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } }}
         >
           {hero && <Logo size={64} animated />}
-          <strong>{busy ? progress || '正在处理…' : '拖入、粘贴图片，或点击'}</strong>
+          {/* 小工具里不能拖文件、不能粘贴：没有提示语就只留按钮；处理中显示进度 */}
+          {(busy || platform.copy.uploadHint) && <strong>{busy ? progress || '正在处理…' : platform.copy.uploadHint}</strong>}
           {!busy && (
             <span className="cta">
               <span className="btn primary pill">选择图片</span>

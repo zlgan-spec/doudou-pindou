@@ -66,6 +66,31 @@ export async function embedPattern(png: Blob, data: PatternData): Promise<Blob> 
   return new Blob([bytes.subarray(0, iend), chunk, bytes.subarray(iend)], { type: 'image/png' });
 }
 
+/** 同步版：直接改 canvas.toDataURL 得到的 PNG data URL（存相册要在点击里立刻调接口，不能等异步） */
+export function embedPatternDataUrl(dataUrl: string, data: PatternData): string {
+  const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (!isPng(bytes)) return dataUrl;
+  const payload = new TextEncoder().encode(`${KEYWORD}\0${toBase64(JSON.stringify({ v: 1, ...data }))}`);
+  const type = new TextEncoder().encode('tEXt');
+  const chunk = new Uint8Array(12 + payload.length);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, payload.length);
+  chunk.set(type, 4);
+  chunk.set(payload, 8);
+  view.setUint32(8 + payload.length, crc32(chunk.subarray(4, 8 + payload.length)));
+  const iend = bytes.length - 12;
+  const out = new Uint8Array(bytes.length + chunk.length);
+  out.set(bytes.subarray(0, iend), 0);
+  out.set(chunk, iend);
+  out.set(bytes.subarray(iend), iend + chunk.length);
+  let s = '';
+  for (let i = 0; i < out.length; i += 0x8000) s += String.fromCharCode.apply(null, Array.from(out.subarray(i, i + 0x8000)));
+  return `data:image/png;base64,${btoa(s)}`;
+}
+
 /** 读出本站导出的图纸数据；不是本站的图、数据不完整或不合法都返回 null */
 export async function readPattern(file: Blob): Promise<PatternData | null> {
   const bytes = new Uint8Array(await file.arrayBuffer());

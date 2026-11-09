@@ -108,7 +108,7 @@ a { color: inherit; }
 .name-pop p { margin: 0 0 10px; font-size: 14px; font-weight: 500; }
 .name-pop .text-input { display: block; width: 100%; min-width: 0; }
 .name-pop-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 12px; }
-.page-actions:not(:empty) { margin-right: 6px; padding-right: 14px; border-right: 1px solid var(--line); } /* 和深浅色、GitHub 隔开 */
+.page-actions:not(:empty) { margin-right: 6px; padding-right: 14px; border-right: 1px solid var(--line); } /* 和深浅色按钮隔开 */
 .page-actions .btn { height: 36px; padding: 0 14px; }
 .page-actions .icon-only { width: 36px; padding: 0; justify-content: center; }
 .page-actions .icon-only svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
@@ -316,11 +316,12 @@ a { color: inherit; }
 .sheet-view.zoomed { display: block; overscroll-behavior: contain; } /* 只在放大后滚到边时不带着整页滚；没放大时鼠标在图纸上照常滚动页面 */
 .sheet-pad { width: fit-content; margin: auto; } /* 放大后四周留灰色空间（内边距由脚本按查看区大小给） */
 .sheet-wrap { position: relative; }
+.sheet-clip { position: absolute; inset: 0; top: 0; left: 0; right: 0; bottom: 0; -webkit-clip-path: inset(0); clip-path: inset(0); } /* 手机上裁掉图纸顶上的署名和底下的色卡，只露网格；用 clip-path 不用 overflow:hidden，后者在 iOS 会变成一层滚动容器，吃掉单指拖动 */
 .sheet { display: block; touch-action: pan-x pan-y; }
 .sheet.editing { cursor: crosshair; touch-action: none; }
 .sheet.hidden, .sheet-overlay.hidden { display: none; }
 /* 原图对照小窗：浮在图纸区上，可拖动、缩放、收起 */
-.ref-win { position: absolute; z-index: 5; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.35); overflow: hidden; }
+.ref-win { position: absolute; z-index: 5; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.35); overflow: hidden; }
 .ref-head { display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 12px; font-size: 12px; font-weight: 500; color: var(--ink); cursor: grab; touch-action: none; user-select: none; }
 .ref-head:active { cursor: grabbing; }
 .ref-head span { margin-right: auto; }
@@ -517,7 +518,7 @@ a { color: inherit; }
 
 /* 点图放大：左边整张图纸，右边信息和按钮 */
 .viewer { width: min(1080px, calc(100vw - 32px)); height: min(760px, calc(100dvh - 48px)); max-width: none; max-height: none; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); overflow: hidden; }
-.viewer[open] { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: minmax(0, 1fr); animation: enter-up 0.3s var(--ease-out) both; }
+.viewer[open] { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: minmax(0, 1fr); animation: enter-up 0.3s var(--ease-out) backwards; } /* backwards 不是 both：both 播完会留下一个 transform，让渲染进来的提示条（position: fixed）跟着窗口内容滚 */
 .viewer::backdrop { background: rgba(10, 10, 10, 0.45); }
 /* 看图区大小固定，图纸在里面缩放、拖动；缩放按钮浮在右下角，和做豆图同一个样式 */
 .viewer-stage { position: relative; min-height: 0; background: var(--card); }
@@ -590,6 +591,7 @@ a { color: inherit; }
 .color-grid button:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -16px rgba(0, 0, 0, 0.3); }
 .color-grid button:active { transform: scale(0.98); }
 .color-chip { display: flex; align-items: flex-end; aspect-ratio: 4 / 3; padding: 8px 10px; border-radius: 11px; font-size: 11px; font-weight: 500; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06); }
+@supports not (aspect-ratio: 1) { .color-chip { min-height: 64px; } } /* 老安卓没有 aspect-ratio：色卡留个最小高度 */
 .color-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 10px 6px 4px; }
 .color-meta b { font-family: var(--mono); font-size: 14px; font-weight: 500; }
 .color-meta small { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
@@ -639,7 +641,10 @@ a { color: inherit; }
 .card-preview { height: 84px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 600; font-size: 26px; border: 1px solid rgba(0, 0, 0, 0.08); }
 /* 高度固定：输色号筛选时弹层不跟着缩、不跳 */
 .palette-modal { width: min(720px, 100%); height: min(80vh, 720px); display: flex; flex-direction: column; }
-.palette-scroll { overflow-y: auto; }
+.palette-modal { position: relative; }
+.palette-scroll { scrollbar-width: none; }
+.palette-scroll::-webkit-scrollbar { display: none; }
+.palette-scroll { overflow-y: auto; padding: 5px; margin: -5px -5px 0; } /* 选中圈画在色块外 4px：四周留出位置，最左最右一列的圈不被裁 */
 .palette-scroll h4 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); font-weight: 500; }
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
 .swatch { height: 36px; border-radius: var(--radius-s); border: 1px solid rgba(0, 0, 0, 0.1); font-family: var(--mono); font-size: 11px; font-weight: 600; transition: transform 0.15s; }
@@ -697,7 +702,7 @@ a { color: inherit; }
   .sheet-view { padding-bottom: 60px; } /* 底部悬浮的撤销、缩放按钮不压住图纸最下面几行 */
   :root { --gutter: 16px; --content-gutter: 16px; }
   .topbar-in { grid-template-columns: auto minmax(0, 1fr); padding: 0 var(--gutter); gap: 8px; height: 58px; } /* 手机上外框没有竖线，不用 +1 */
-  .frame { min-height: calc(100vh - 59px); }
+  .frame { min-height: calc(100vh - 59px); min-height: calc(var(--app-h, 100vh) - var(--top-inset, 0px) - 59px); } /* 顶部给状态栏和小红书按钮留了位置，这里要减掉，不然每页都比屏幕高一截、一滑就往上顶 */
   .brand span { display: none; }
   .nav-extra { display: none; } /* 手机上「我的收藏」只显示「收藏」 */
   .topbar .github { display: none; } /* 顶栏放不下四个按钮加 GitHub，手机上 GitHub 只在页脚 */
@@ -708,8 +713,9 @@ a { color: inherit; }
   .topbar .crumb-sep { display: none; } /* 手机上只留图标 + 链接 */
   .nav-links a { padding: 6px 8px; }
   .topbar .github { padding: 0; width: 36px; height: 36px; justify-content: center; font-size: 0; gap: 0; } /* 手机上只留图标 */
-  .app:has(.page-actions:not(:empty)) .frame { padding-bottom: 76px; } /* 给底部的收藏 / 导入 / 导出留位置，不盖住最后几行 */
+  .app.page-make .frame { padding-bottom: 76px; } /* 给底部的收藏 / 导入 / 存相册留位置，不盖住最后几行（小工具版：老安卓不支持 :has，按页面判断） */
   .page-actions:not(:empty) { position: fixed; left: 50%; bottom: 14px; z-index: 30; transform: translateX(-50%); margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.35); }
+  .page-make .toast { bottom: 92px; } /* 小工具版：提示条浮在底部操作条上面，不盖住「存相册」 */
   .adjust-pop { top: 70px; left: 8px; }
   .tool-rail { position: static; flex-direction: row; max-height: none; overflow-x: auto; margin-bottom: 8px; order: -1; }
   .tool-rail button { flex: none; width: 46px; }
@@ -726,7 +732,7 @@ a { color: inherit; }
   .cell.tool-body { padding: var(--search-gap) var(--content-gutter) 36px; }
   .terms > section { grid-template-columns: 1fr; row-gap: 8px; padding: 22px 0; }
   .hero-copy { padding: 44px var(--content-gutter) 36px; gap: 28px; }
-  .hero-field { min-height: min(560px, calc(100vh - 140px)); }
+  .hero-field { min-height: min(560px, calc(100vh - 140px)); min-height: min(560px, calc(var(--app-h, 100vh) - var(--top-inset, 0px) - 140px)); }
   .hero-center { padding: 44px var(--content-gutter); gap: 16px; }
   .pegboard { padding: 24px 12px; }
   .drop-body { padding: 24px 18px 28px; }
@@ -740,12 +746,18 @@ a { color: inherit; }
   .zoom-input { display: none; }
   .sheet-view { height: auto; aspect-ratio: 1 / 1.08; max-height: min(70vh, calc(100dvh - 290px)); } /* 跟着图纸的比例走，不留一大块空白；自动滚到图纸时底边停在底部操作条上方，撤销、缩放不被挡 */
   .sheet-view.zoomed { aspect-ratio: auto; height: 70vh; }
+  /* 老安卓（Chrome 61）没有 aspect-ratio：给个按屏宽算的固定高度 */
+  @supports not (aspect-ratio: 1) { .sheet-view { height: 100vw; max-height: 70vh; } .sheet-view.zoomed { height: 70vh; } }
   .seg button { padding: 6px 10px; }
   .field-head { flex-direction: column; align-items: flex-start; gap: 2px; }
   .field-head small { text-align: left; }
   .viewer { height: calc(100dvh - 24px); }
   .viewer[open] { grid-template-columns: 1fr; grid-template-rows: 56dvh auto; overflow: auto; }
   .viewer-info { padding: 18px 16px; border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  /* 小工具顶部有状态栏和小红书的按钮：大图窗口从它们下面开始；关闭按钮位置不变（标题右边），和「存相册」一样实心填充（浅色界面黑底白叉），往下滚也一直在 */
+  .viewer[open] { top: var(--top-inset, 0px); bottom: auto; margin: 0 auto; height: calc(100vh - 12px); height: calc(var(--app-h, 100vh) - var(--top-inset, 0px) - 12px); }
+  .viewer-close { background: var(--ink); color: var(--on-ink); }
+  .viewer-close:hover { background: var(--ink); }
   .color-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .pattern-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } /* 图纸库手机上一行两张，比色卡大 */
   /* 标签栏（图纸库、我的收藏、色卡库共用）：手机上只占一行、左右滑；两边贴到屏幕边，露出半个按钮，看得出还能滑 */
@@ -785,3 +797,161 @@ a { color: inherit; }
 .start-head { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 .draft-offer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px 10px 16px; max-width: 640px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 14px; }
 .draft-offer span { margin-right: auto; }
+@media (max-width: 860px) {
+  /* 手机上一行放不下：文字一整行，下面一行右对齐「不用」「接着改」（和弹窗的取消 / 确定同一个排法） */
+  .draft-offer { justify-content: flex-end; border-radius: var(--radius); padding: 12px 14px; }
+  .draft-offer span { flex-basis: 100%; margin-right: 0; }
+}
+
+
+/* ===== 小红书小工具版：手机端适配 ===== */
+/* 顶部让出状态栏和小红书的按钮（--top-inset 由 safeArea.ts 按平台窗口信息设置） */
+.app { padding-top: var(--top-inset, 0px); }
+.app::before { content: ''; position: fixed; left: 0; right: 0; top: 0; height: var(--top-inset, 0px); background: var(--bg); z-index: 21; pointer-events: none; }
+.topbar { top: var(--top-inset, 0px); }
+/* 底部让出手机底部横条 */
+@media (max-width: 860px) {
+  .page-actions:not(:empty) { bottom: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .page-make .toast { bottom: 92px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+  .frame { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* 工具栏九个工具一屏放下，不用横着滑 */
+  .tool-rail button { flex: 1 1 0; width: auto; min-width: 34px; }
+  .tool-rail .rail-adjust, .tool-rail .rail-color { margin-left: 2px; }
+}
+/* 横屏手机：图纸区按屏幕高度给，不跟着宽度算成一条 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .sheet-view, .sheet-view.zoomed { height: 70vh; height: calc(var(--app-h, 100vh) - var(--top-inset, 0px) - 64px - 24px); min-height: 220px; max-height: none; aspect-ratio: auto; }
+}
+/* 存到相册预览 */
+.export-sheet { width: 400px; width: calc(100vw - 32px); max-width: 420px; }
+.export-preview { display: flex; align-items: center; justify-content: center; min-height: 160px; margin: 4px 0 12px; padding: 8px; border-radius: 12px; background: var(--fill); }
+.export-preview img { display: block; max-width: 100%; max-height: 46vh; object-fit: contain; }
+.export-sheet .switch-row { padding-left: 0; padding-right: 0; }
+.export-sheet .ask-actions { margin-top: 12px; }
+
+/* ===== 小工具版：手机编辑器（一屏、拇指区、触屏） ===== */
+@media (max-width: 860px) {
+  /* 一屏：不再整页上下滚，图纸占满中间 */
+  .page-make .foot { display: none; }
+  .app.page-make .frame { padding-bottom: 0; min-height: 0; }
+  .page-make .view .cell { padding: 8px var(--gutter) 0; }
+  .page-make .result { display: flex; flex-direction: column; align-items: stretch; gap: 6px; height: calc(100vh - 59px - 9px); height: calc(var(--app-h, 100vh) - var(--top-inset, 0px) - 59px - 9px - env(safe-area-inset-bottom, 0px)); }
+  .page-make .result-main { flex: 1; min-height: 0; gap: 6px; }
+  .page-make .sheet-stage { flex: 1; min-height: 0; }
+  .page-make .sheet-view, .page-make .sheet-view.zoomed { flex: 1; min-height: 0; height: auto; max-height: none; aspect-ratio: auto; padding-bottom: 0; }
+  @supports not (aspect-ratio: 1) { .page-make .sheet-view, .page-make .sheet-view.zoomed { height: auto; max-height: none; } }
+  .page-make .tool-rail { order: 2; margin: 6px 0 0; }
+  .page-make .float-zoom { display: none; } /* 双指缩放就够了 */
+
+  /* 顶上一行：左边名字，右边收藏 / 换图 / 存相册（原来浮在底部，会盖住色号） */
+  .page-make .mobile-title { width: auto; margin: 0 206px 0 0; padding: 7px 10px; }
+  /* 挂在吸顶的顶栏上（absolute），不用 fixed：页面回弹、滚动时和顶栏、名字一起动，不会单独停在屏幕上 */
+  .app.page-make .page-actions:not(:empty) { position: absolute; top: calc(100% + 9px); bottom: auto; left: auto; right: var(--gutter); transform: none; padding: 0; border: 0; background: none; box-shadow: none; gap: 6px; }
+  .page-make .page-actions .theme-toggle { display: none; } /* 新手引导第一次进来自动出现 */
+  .page-make .page-actions .btn { min-height: 36px; }
+  .page-make .page-actions .icon-only { width: 36px; padding: 0; }
+  .page-make .page-actions .btn-icon:not(.primary) { width: 36px; padding: 0; justify-content: center; font-size: 0; gap: 0; }
+  .page-make .page-actions .btn-icon:not(.primary) svg { width: 18px; height: 18px; }
+  .page-make .page-actions .btn.primary { padding: 0 14px; }
+  .page-make .name-pop { position: absolute; top: calc(100% + 8px); bottom: auto; left: auto; right: 0; width: 260px; }
+  .page-make .toast { top: auto; bottom: 150px; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+
+  /* 色号清单 → 底部一排色块：点一下用它画，再点一下换色 / 删掉 */
+  .page-make .bead-list { position: static; height: auto; flex: none; flex-direction: row; align-items: center; gap: 6px; padding: 0 0 8px; border: 0; border-radius: 0; background: none; overflow: visible; }
+  .page-make .bead-list-head, .page-make .bead-cols, .page-make .bead-more { display: none; }
+  .page-make .bead-list ul { display: flex; flex: 1; min-width: 0; gap: 2px; overflow-x: auto; overflow-y: hidden; padding: 0; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .page-make .bead-list ul::-webkit-scrollbar { display: none; }
+  .sheet-backdrop { position: fixed; inset: 0; z-index: 39; background: rgba(10, 10, 10, 0.18); animation: enter-fade 0.2s ease both; }
+  .page-make .bead-list { position: relative; top: auto; } /* 统一滚动条按它定位；top:auto 去掉电脑版的吸顶偏移 */
+  .page-make .bead-list li { display: block; flex: none; padding: 0; border-radius: 12px; background: none; }
+  .page-make .bead-list li.on { background: var(--fill); }
+  .page-make .bead-list li.on .bead-swatch { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--ink); }
+  .page-make .bead-row { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; display: flex; flex-direction: column; align-items: center; gap: 3px; width: 48px; padding: 6px 0 5px; }
+  .page-make .bead-swatch { width: 26px; height: 26px; }
+  .page-make .bead-row b { font-size: 11px; }
+  .page-make .bead-row .num { font-size: 10px; font-weight: 400; color: var(--muted); text-align: center; }
+  /* 颜色数量、豆板尺寸：色块条右边两个小按钮，点开从底部升起 */
+  .page-make .bead-merge { flex: none; gap: 4px; padding: 0; border: 0; }
+  .page-make .bead-merge + .bead-merge { margin-left: -2px; }
+  .page-make .bead-merge-head { justify-content: center; min-height: 36px; padding: 0 10px; border-radius: 10px; background: var(--fill); }
+  .page-make .bead-merge-head span, .page-make .bead-merge-head .caret { display: none; }
+  .page-make .bead-merge-head b { margin: 0; }
+  .page-make .bead-merge.open { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; gap: 10px; padding: 14px var(--gutter) 18px; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; background: var(--surface); box-shadow: 0 -16px 40px -16px rgba(0, 0, 0, 0.3); max-height: 70vh; overflow: auto; }
+  .page-make .bead-merge.open .bead-merge-head { justify-content: flex-start; background: none; padding: 0; }
+  .page-make .bead-merge.open .bead-merge-head span, .page-make .bead-merge.open .bead-merge-head .caret { display: inline-block; }
+  .page-make .bead-merge.open .bead-merge-head b { margin-left: auto; }
+  .page-make .bead-merge.open .bead-merge-head span, .page-make .bead-merge.open .bead-merge-head b { font-size: 15px; }
+
+  /* 描边、调整：从底部升起，不挡图纸和别的按钮；文字：放在上面，键盘起来也挡不住 */
+  .page-make .adjust-pop { position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; z-index: 40; padding: 10px 8px 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); border-radius: 16px 16px 0 0; max-height: 70vh; overflow: auto; box-shadow: 0 -16px 40px -16px rgba(0, 0, 0, 0.3); }
+  .page-make .adjust-pop.text-pop { top: calc(59px + 56px); top: calc(var(--top-inset, 0px) + 59px + 56px); bottom: auto; left: var(--gutter); right: var(--gutter); border-radius: var(--radius); box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.3); }
+  .page-make .switch-row { min-height: 48px; }
+}
+/* 手指操作：选区的角、移动、旋转手柄和选区按钮都放大到手指好按 */
+@media (pointer: coarse) {
+  .fh { width: 24px; height: 24px; border-radius: 6px; }
+  .fh.tl { left: -12px; top: -12px; }
+  .fh.br { right: -12px; bottom: -12px; }
+  .fh.tr { right: -12px; top: -12px; }
+  .fh.bl { left: -12px; bottom: -12px; }
+  .fh-move { width: 40px; height: 40px; margin: -20px 0 0 -20px; }
+  .fh-rot { width: 24px; height: 24px; margin-left: -12px; }
+  .sel-pop button { padding: 10px 16px; font-size: 14px; }
+}
+@media (max-width: 860px) {
+  /* 撤销 / 重做、网格开关浮在图纸角上：工具栏挪到下面后，要让开工具栏 */
+  .page-make .float-bar { bottom: 82px; }
+}
+/* 横屏（只保证能用）：退回能上下滚的页面，图纸给足高度 */
+@media (max-width: 960px) and (orientation: landscape) and (max-height: 520px) {
+  .page-make .result { height: auto; }
+  .page-make .sheet-stage, .page-make .result-main { flex: none; }
+  .page-make .sheet-view, .page-make .sheet-view.zoomed { flex: none; height: 80vh; height: calc(100vh - 40px); min-height: 220px; }
+  .app.page-make .frame { padding-bottom: 0; }
+}
+
+/* 小工具版：上传区没有那句提示，指向它的手绘箭头也不要 */
+.cta-arrow { display: none; }
+/* 小工具顶部有状态栏和小红书按钮：居中的弹窗（选颜色、色号卡片）上边从它们下面开始 */
+.modal-backdrop { padding-top: max(16px, calc(var(--top-inset, 0px) + 8px)); }
+
+/* 选图后的裁剪：深色全屏，框外压暗，框内三分线，四角白色 L 形手柄（和相册裁图一样） */
+.cropper { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: #000; padding-top: var(--top-inset, 0px); touch-action: none; user-select: none; -webkit-user-select: none; animation: enter-fade 0.2s ease both; }
+.cropper-stage { position: relative; flex: 1; min-height: 0; margin: 16px 20px 8px; overflow: hidden; }
+.cropper-stage img { position: absolute; display: block; max-width: none; pointer-events: none; }
+.crop-box { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); outline: 1.5px solid #fff; cursor: move; touch-action: none; }
+.crop-thirds { position: absolute; inset: 0; pointer-events: none; background:
+  linear-gradient(to right, transparent calc(33.333% - 0.5px), rgba(255, 255, 255, 0.45) calc(33.333% - 0.5px), rgba(255, 255, 255, 0.45) calc(33.333% + 0.5px), transparent calc(33.333% + 0.5px), transparent calc(66.666% - 0.5px), rgba(255, 255, 255, 0.45) calc(66.666% - 0.5px), rgba(255, 255, 255, 0.45) calc(66.666% + 0.5px), transparent calc(66.666% + 0.5px)),
+  linear-gradient(to bottom, transparent calc(33.333% - 0.5px), rgba(255, 255, 255, 0.45) calc(33.333% - 0.5px), rgba(255, 255, 255, 0.45) calc(33.333% + 0.5px), transparent calc(33.333% + 0.5px), transparent calc(66.666% - 0.5px), rgba(255, 255, 255, 0.45) calc(66.666% - 0.5px), rgba(255, 255, 255, 0.45) calc(66.666% + 0.5px), transparent calc(66.666% + 0.5px)); }
+/* 角：看得见的是 20px 的 L，能按到的是 44px */
+.crop-corner { position: absolute; width: 44px; height: 44px; touch-action: none; }
+.crop-corner::before { content: ''; position: absolute; width: 20px; height: 20px; border: 0 solid #fff; }
+.crop-corner.tl { left: -22px; top: -22px; cursor: nwse-resize; }
+.crop-corner.tr { right: -22px; top: -22px; cursor: nesw-resize; }
+.crop-corner.bl { left: -22px; bottom: -22px; cursor: nesw-resize; }
+.crop-corner.br { right: -22px; bottom: -22px; cursor: nwse-resize; }
+.crop-corner.tl::before { left: 19px; top: 19px; border-left-width: 4px; border-top-width: 4px; }
+.crop-corner.tr::before { right: 19px; top: 19px; border-right-width: 4px; border-top-width: 4px; }
+.crop-corner.bl::before { left: 19px; bottom: 19px; border-left-width: 4px; border-bottom-width: 4px; }
+.crop-corner.br::before { right: 19px; bottom: 19px; border-right-width: 4px; border-bottom-width: 4px; }
+.cropper-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 20px 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.cropper-actions .btn.link { color: #fff; }
+.cropper-actions .btn.primary { background: #fff; border-color: #fff; color: #0a0a0a; }
+
+/* 回看引导的 ? 按钮：手机上顶栏的引导按钮藏起来了，放到网格按钮旁边；宽屏顶栏还有，不重复 */
+@media (min-width: 861px) { .guide-btn { display: none; } }
+
+/* 统一的细滚动条（ScrollBar 组件）：横竖同一个样子，3px、圆角、浅灰轨道、深灰滑块 */
+.sbar { position: absolute; z-index: 3; border-radius: 2px; background: var(--line); pointer-events: none; }
+.sbar-x { height: 3px; }
+.sbar-y { width: 3px; }
+.sbar i { position: absolute; border-radius: 2px; background: var(--muted); }
+.sbar-x i { top: 0; bottom: 0; }
+.sbar-y i { left: 0; right: 0; }
+/* 用了统一滚动条的地方，系统滚动条藏掉，免得两条 */
+.chips, .palette-scroll, .page-make .sheet-view, .page-make .tool-rail, .viewer-sheet { scrollbar-width: none; }
+.chips::-webkit-scrollbar, .palette-scroll::-webkit-scrollbar, .page-make .sheet-view::-webkit-scrollbar, .page-make .tool-rail::-webkit-scrollbar, .viewer-sheet::-webkit-scrollbar { display: none; }
+.color-tools, .sheet-stage { position: relative; }
+
+/* 触屏上不画焦点框：弹窗打开时浏览器会把焦点放到第一个按钮上，给它套一圈黑框（键盘用户才需要） */
+@media (pointer: coarse) { :focus-visible, .nav-links a:focus-visible { outline: none; } }

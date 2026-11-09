@@ -48,7 +48,7 @@ export function frame(phi: number, filterId: string, seed: number, wobble: numbe
     ? brush(`<path d="M${50 + r * 0.72} ${top - cy * 0.7} A${r} ${cy} 0 1 0 ${50 + r * 0.72} ${top + cy * 0.7}" fill="none" stroke="${ink}" stroke-linecap="round"/>`, 7.6 * (0.45 + 0.55 * s), `stroke-opacity="${cAlpha.toFixed(2)}"`)
     : '';
   const filter = wobble
-    ? `<defs><filter id="${filterId}" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="${seed}"/><feDisplacementMap in="SourceGraphic" scale="${wobble}"/></filter></defs>`
+    ? `<defs><filter id="${filterId}" filterUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="${seed}"/><feDisplacementMap in="SourceGraphic" scale="${wobble}"/></filter></defs>`
     : '';
   return `${filter}<g${wobble ? ` filter="url(#${filterId})"` : ''}>${body}${face}${cMark}</g>`;
 }

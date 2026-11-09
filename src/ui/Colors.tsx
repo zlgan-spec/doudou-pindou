@@ -1,5 +1,7 @@
-// 色卡库：MARD 221 色全部色号。按系列看、搜色号或 Hex 色值，点一下复制色号。
+// 色卡库：MARD 221 色全部色号。按系列看、搜色号或 Hex 色值，点一下选中色号，回到做豆图画笔就用它。
 import { useMemo, useRef, useState } from 'react';
+import { ScrollBar } from './ScrollBar';
+import { platform } from '@platform';
 import { rgbToLab, textColorOn } from '../core/color';
 import { matchDistance, PALETTE, type BeadColor } from '../core/palette';
 import { rememberCopiedColor } from './handoff';
@@ -22,7 +24,7 @@ const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: '怎么查色号？',
-    a: '三种方式：在上面的搜索框输入色号（如 A1、H7），列出这个色号；输入 Hex 色值（如 #FF6B6B），列出最接近的几个色号；或者点系列标签，按 A 到 M 分组浏览。点任意一张色卡就会复制色号。',
+    a: '三种方式：在上面的搜索框输入色号（如 A1、H7），列出这个色号；输入 Hex 色值（如 #FF6B6B），列出最接近的几个色号；或者点系列标签，按 A 到 M 分组浏览。' + platform.copy.colorsFaq,
   },
   {
     q: '221 色和 291 色有什么区别？',
@@ -39,6 +41,7 @@ const FAQ: Array<{ q: string; a: string }> = [
 ];
 
 export function Colors() {
+  const chipsRef = useRef<HTMLDivElement>(null);
   const [series, setSeries] = useState<string>('全部');
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -59,12 +62,15 @@ export function Colors() {
 
   const copy = async (code: string) => {
     rememberCopiedColor(code); // 回到做豆图时画笔直接换成这个颜色
-    try {
-      await navigator.clipboard.writeText(code);
-      setToast(`已复制 ${code}`);
-    } catch {
-      setToast(`色号 ${code}`);
-    }
+    // 能用剪贴板的渠道顺手复制；不能的（小工具）只记下这个色号
+    if (platform.copyText) {
+      try {
+        await platform.copyText(code);
+        setToast(platform.copy.colorPicked(code));
+      } catch {
+        setToast(`色号 ${code}`);
+      }
+    } else setToast(platform.copy.colorPicked(code));
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 1400);
   };
@@ -81,7 +87,8 @@ export function Colors() {
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜色号或 Hex，如 A1、#FF6B6B" maxLength={8} aria-label="搜索色号或 Hex 色值" />
           {hexRgb && <span className="search-chip" style={{ background: `rgb(${hexRgb.join(',')})` }} />}
         </label>
-        <div className="chips" role="tablist" aria-label="系列">
+        <ScrollBar target={chipsRef} axis="x" />
+        <div className="chips" ref={chipsRef} role="tablist" aria-label="系列">
           {['全部', ...SERIES].map(sr => {
             const n = sr === '全部' ? PALETTE.length : PALETTE.filter(c => c.code.replace(/\d+$/, '') === sr).length;
             return (
@@ -91,7 +98,7 @@ export function Colors() {
             );
           })}
           {/* 一句操作说明跟在系列按钮后面，不单独占一行 */}
-          {list.length > 0 && <span className="chips-note">{hexRgb ? `和 #${query.trim().replace('#', '').toUpperCase()} 最接近的 ${NEAREST_COUNT} 个，越靠前越接近` : '点色卡即可复制色号'}</span>}
+          {list.length > 0 && <span className="chips-note">{hexRgb ? `和 #${query.trim().replace('#', '').toUpperCase()} 最接近的 ${NEAREST_COUNT} 个，越靠前越接近` : platform.copy.colorsHint}</span>}
         </div>
       </div>
 
@@ -101,7 +108,7 @@ export function Colors() {
         <ul className="color-grid">
           {list.map((c, i) => (
             <li key={c.code} style={{ '--i': Math.min(i, 40) } as React.CSSProperties}>
-              <button onClick={() => void copy(c.code)} title={`复制 ${c.code}`}>
+              <button onClick={() => void copy(c.code)} title={platform.copyText ? `复制 ${c.code}` : `选 ${c.code}`}>
                 <span className="color-chip" style={{ background: c.hex, color: textColorOn(c.hex) }}>{c.near && i === 0 ? '最接近' : ''}</span>
                 <span className="color-meta">
                   <b>{c.code}</b>

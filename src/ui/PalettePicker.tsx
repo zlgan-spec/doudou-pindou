@@ -1,6 +1,7 @@
 // MARD 色板选择器：按系列分组列出全部色号。用于"加颜色"和"替换为…"。
 // 标题旁边可以直接输色号：边输边筛，回车选中；替换时最上面一行是「相近」的 4 个色
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { ScrollBar } from './ScrollBar';
 import { textColorOn } from '../core/color';
 import { PALETTE, similarColors } from '../core/palette';
 
@@ -17,6 +18,8 @@ interface Props {
 
 export function PalettePicker({ title, highlight = [], current, similarTo, onPick, onClose }: Props) {
   const [query, setQuery] = useState('');
+  // 和全站同一套细滚动条（系统滚动条在手机上改不了样子）
+  const scrollRef = useRef<HTMLDivElement>(null);
   const groups = useMemo(() => {
     const map = new Map<string, typeof PALETTE[number][]>();
     for (const c of PALETTE) {
@@ -63,9 +66,10 @@ export function PalettePicker({ title, highlight = [], current, similarTo, onPic
             aria-label="输入色号"
             autoFocus={window.matchMedia('(pointer: fine)').matches}
           />
-          <button className="icon-btn" onClick={onClose} aria-label="关闭">✕</button>
+          <button className="viewer-close" onClick={onClose} aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg></button>
         </div>
-        <div className="palette-scroll">
+        <ScrollBar target={scrollRef} axis="y" deps={[q]} />
+        <div className="palette-scroll" ref={scrollRef}>
           {q ? (
             matches.length ? <div className="swatches">{matches.map(c => swatch(c))}</div> : <p className="palette-empty">没有 {q} 这个色号</p>
           ) : (

@@ -1,4 +1,6 @@
-// 我的收藏（顶部导航里单独一个按钮）：用户点了「收藏」的图纸。和图纸库一样搜索、按标签筛、点图放大；大图旁边下载、接着改、取消收藏。
+// 我的收藏（顶部导航里单独一个按钮）：用户点了「收藏」的图纸。和图纸库一样搜索、按标签筛、点图放大；大图旁边下载 / 存相册、接着改、取消收藏。
+// 能下载文件的渠道（网站版）还有导出 / 导入备份；小工具版没有（不能下载文件，选图器也只能选图片）。
+import { platform } from '@platform';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NoteToast } from './NoteToast';
@@ -49,7 +51,7 @@ export function Mine({ onOpen }: Props) {
 
   // 导出 / 导入备份放进顶栏右侧（和做豆图页放收藏 / 导入 / 下载同一个位置）
   const [slot, setSlot] = useState<HTMLElement | null>(null);
-  useEffect(() => setSlot(document.getElementById('page-actions')), []);
+  useEffect(() => setSlot(platform.caps.backup ? document.getElementById('page-actions') : null), []);
 
   return (
     <>
@@ -75,7 +77,7 @@ export function Mine({ onOpen }: Props) {
             if (!e) return null;
             return (
               <>
-                <button className="btn primary pill" onClick={() => downloadSheet(e)}>下载图纸</button>
+                <button className="btn primary pill" onClick={() => downloadSheet(e)}>{platform.copy.sheetExportLabel}</button>
                 <button className="btn pill" onClick={() => { close(); onOpen(e); }}>接着改</button>
                 <button className="btn link" onClick={() => unstar(e, close)}>取消收藏</button>
               </>
@@ -83,7 +85,7 @@ export function Mine({ onOpen }: Props) {
           }}
         />
       )}
-      <p className="fine mine-note">收藏只保存在当前浏览器，换设备前先导出备份</p>
+      <p className="fine mine-note">{platform.copy.mineNote}</p>
     </>
   );
 }

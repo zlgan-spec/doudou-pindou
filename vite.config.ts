@@ -1,9 +1,19 @@
 /// <reference types="vitest/config" />
+// 一份代码出两个渠道：
+// - 默认（npm run build）：网站版，部署到 GitHub Pages
+// - --mode xhs（npm run build:xhs）：小红书小工具版，产物在 dist-xhs/，再由 scripts/pack-xhs.mjs 打成 zip
+// 渠道差异都在 src/platform/ 里，@platform 别名按 mode 指向 web 或 xhs 那份实现，另一份不会进包。
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { cpSync, readFile, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
+import { compatCss } from './scripts/compat-css.mjs';
+
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+
+// ---------- 网站版 ----------
 
 // 仅本地开发，不会被打包发布：
 // - 出图测试台读本机的测试图：默认 test-images/（不进仓库），可以用 DOUDOU_TEST_IMAGES 指到别的文件夹
@@ -15,25 +25,21 @@ function localDev(): Plugin {
     configureServer(server) {
       const library = process.env.DOUDOU_LIBRARY;
       if (library) {
-        server.middlewares.use('/patterns/index.json', async (_req, res, next) => {
-          try {
-            const body = await readFile(path.resolve(library));
+        server.middlewares.use('/patterns/index.json', (_req, res, next) => {
+          readFile(path.resolve(library), (err, body) => {
+            if (err) return next();
             res.setHeader('Content-Type', 'application/json');
             res.end(body);
-          } catch {
-            next();
-          }
+          });
         });
       }
-      server.middlewares.use('/test-images/', async (req, res, next) => {
+      server.middlewares.use('/test-images/', (req, res, next) => {
         const name = path.basename(decodeURIComponent((req.url ?? '').split('?')[0]));
-        try {
-          const body = await readFile(path.resolve(process.env.DOUDOU_TEST_IMAGES ?? 'test-images', name));
+        readFile(path.resolve(process.env.DOUDOU_TEST_IMAGES ?? 'test-images', name), (err, body) => {
+          if (err) return next();
           res.setHeader('Content-Type', 'image/png');
           res.end(body);
-        } catch {
-          next();
-        }
+        });
       });
     },
   };
@@ -75,12 +81,108 @@ function securityHeaders(): Plugin {
   };
 }
 
-export default defineConfig({
-  // GitHub Pages 项目页部署在 /doudou-pindou/ 下，本地开发用根路径
-  base: process.env.BASE_PATH ?? '/',
-  plugins: [react(), localDev(), themeBoot(), securityHeaders()],
-  worker: { format: 'es' },
-  optimizeDeps: { exclude: ['onnxruntime-web'] },
-  // 测试只跑本仓库自己的，不进本地工具目录
-  test: { exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'] },
+// ---------- 小红书小工具版 ----------
+// 容器要求（见官方 Skill minitool-zip-builder）：资源全用相对路径；不能联网；不能有内联 <script>、type="module"、import/export，
+// 只能是经典脚本；JS 转译到 ES2017 / Chrome 61，CSS 也按 Chrome 61 降级；不能带 source map 和构建配置
+
+// 图纸库打进包里（容器禁 fetch）：从 public/patterns/index.json 只取作者 DouDou、出处 AI 原创的图纸，不带外链字段；
+// 系列只留还有图纸的。规则改了要同步 CONTRIBUTING.md
+const LIBRARY_ID = 'virtual:library-data';
+function libraryData(): Plugin {
+  return {
+    name: 'xhs-library-data',
+    resolveId: id => (id === LIBRARY_ID ? `\0${LIBRARY_ID}` : null),
+    load(id) {
+      if (id !== `\0${LIBRARY_ID}`) return null;
+      const src = JSON.parse(readFileSync(path.join(ROOT, 'public/patterns/index.json'), 'utf8')) as {
+        v: unknown; series: Array<{ id: string }>; patterns: Array<Record<string, unknown>>;
+      };
+      const patterns = src.patterns
+        .filter(p => p.author === 'DouDou' && p.source === 'AI 原创')
+        .map(({ link: _link, ...p }) => { void _link; return p; });
+      const used = new Set(patterns.map(p => p.series));
+      const series = src.series.filter(s => used.has(s.id));
+      return `export default ${JSON.stringify({ v: src.v, series, patterns })};`;
+    },
+  };
+}
+
+// Vite 总会输出 <script type="module" crossorigin>：改成放在 body 末尾的经典脚本（IIFE 立即执行，要等 #root 已经在页面里）。
+// 顺手把网站版的 viewport / 图标 / 描述换成小工具要的
+function xhsHtml(): Plugin {
+  return {
+    name: 'xhs-html',
+    apply: 'build',
+    enforce: 'post',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        const tags: string[] = [];
+        let out = html.replace(/\s*<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g, (_m, src: string) => {
+          tags.push(`    <script src="${src}"></script>`);
+          return '';
+        });
+        out = out.replace(/\s+crossorigin(?=[\s>])/g, '');
+        out = out.replace(/<meta name="viewport"[^>]*>/, '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />');
+        out = out.replace(/\s*<meta name="description"[^>]*>/, '').replace(/\s*<link rel="icon"[^>]*>/, '');
+        return out.replace('</body>', `${tags.join('\n')}\n  </body>`);
+      },
+    },
+  };
+}
+
+// public/ 里网站版才用的东西（抠图模型、图纸库 json、图标）不进小工具包：关掉 publicDir，只把字体拷过去
+function xhsPublic(): Plugin {
+  return {
+    name: 'xhs-public',
+    apply: 'build',
+    closeBundle() {
+      // 只拷字体文件本身；许可全文 OFL.txt 不在容器允许的文件类型里，协议页里已经带了全文
+      cpSync(path.join(ROOT, 'public/fonts'), path.join(ROOT, 'dist-xhs/fonts'), { recursive: true, filter: src => !src.endsWith('.txt') });
+    },
+  };
+}
+
+// 构建后的 CSS 补 Chrome 61 回退写法（见 scripts/compat-css.mjs）
+function cssCompat(): Plugin {
+  return {
+    name: 'xhs-css-compat',
+    apply: 'build',
+    writeBundle(opts, bundle) {
+      for (const name of Object.keys(bundle)) {
+        if (!name.endsWith('.css')) continue;
+        const file = path.join(opts.dir ?? 'dist-xhs', name);
+        writeFileSync(file, compatCss(readFileSync(file, 'utf8')));
+      }
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const xhs = mode === 'xhs';
+  return {
+    // GitHub Pages 项目页部署在 /doudou-pindou/ 下，本地开发用根路径；小工具 zip 里全是相对路径
+    base: xhs ? './' : process.env.BASE_PATH ?? '/',
+    resolve: {
+      alias: { '@platform': path.join(ROOT, xhs ? 'src/platform/xhs/index.ts' : 'src/platform/web/index.ts') },
+    },
+    publicDir: xhs ? false : 'public',
+    plugins: xhs ? [react(), libraryData(), xhsHtml(), xhsPublic(), cssCompat()] : [react(), localDev(), themeBoot(), securityHeaders()],
+    worker: { format: 'es' },
+    optimizeDeps: { exclude: ['onnxruntime-web'] },
+    build: xhs
+      ? {
+          outDir: 'dist-xhs',
+          target: ['es2017', 'chrome61'],
+          cssTarget: ['chrome61'],
+          sourcemap: false,
+          modulePreload: false,
+          cssCodeSplit: false,
+          assetsInlineLimit: 0,
+          rolldownOptions: { output: { format: 'iife', codeSplitting: false } },
+        }
+      : {},
+    // 测试只跑本仓库自己的，不进本地工具目录
+    test: { exclude: ['**/node_modules/**', '**/dist/**', '**/dist-xhs/**', '.claude/**'] },
+  };
 });

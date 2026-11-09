@@ -23,7 +23,7 @@ function frame(filterId: string, seed: number): string {
     + `<path d="${l.d}" fill="none" stroke="${fill}" stroke-width="${FACE}" stroke-linecap="round" stroke-linejoin="round"/></g>`;
   const side = LETTERS.map(l => tube(l, DEPTH, 'var(--bead-side, #dedbd3)')).join('');
   const face = LETTERS.map(l => tube(l, 0, 'var(--bead-face, #ffffff)')).join('');
-  return `<defs><filter id="${filterId}" x="-5%" y="-10%" width="110%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="${seed}"/><feDisplacementMap in="SourceGraphic" scale="3"/></filter></defs>`
+  return `<defs><filter id="${filterId}" filterUnits="userSpaceOnUse" x="-40" y="-40" width="360" height="210"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="${seed}"/><feDisplacementMap in="SourceGraphic" scale="3"/></filter></defs>`
     + `<g filter="url(#${filterId})">${side}${face}</g>`;
 }
 

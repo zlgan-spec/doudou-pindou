@@ -17,6 +17,8 @@ import { DEFAULT_SIZING, SizePicker, modeLabel, type Sizing } from './SizePicker
 import { readPattern } from './pngData';
 import { clearDraft, loadDraft, saveDraft, type Draft } from './draft';
 import { FileTooLargeError, isHeic, loadImage, MAX_FILE_BYTES } from './loadImage';
+import { askCrop } from './Cropper';
+import { platform } from '@platform';
 import { imageFromPaste } from './paste';
 import { createPattern, deletePattern, getPattern, listPatterns, subscribe, updatePattern, type PatternEntry } from './store';
 
@@ -94,11 +96,10 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
   // 没有原图、只有图纸：从「我的收藏」打开的，或拖回来的本站图纸 PNG。只能编辑，不能改尺寸风格重新生成
   const fromStore = !source && !!history;
 
-  // 手机上图纸在下方：每次生成完、图纸渲染出来之后再滚过去（渲染前页面不够高，滚不到位）
+  // 手机上编辑器是一屏放下的：生成完回到页面顶部，不往下滚（往下滚会把顶部顶到状态栏和小红书按钮下面）
   useEffect(() => {
     if (genId === 0 || !window.matchMedia('(max-width: 860px)').matches) return;
-    const timer = window.setTimeout(() => stage.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-    return () => window.clearTimeout(timer);
+    window.scrollTo(0, 0);
   }, [genId]);
 
   // 没收藏的图纸自动存成草稿（只存一张），刷新、关页面再回来能接着改；收藏后改动跟着收藏存，草稿就不要了
@@ -159,7 +160,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       pendingStore.current = null;
       // 尺寸、占满整板也跟着存：收藏后换豆板重新生成，收藏里是新的这份
       const ok = updatePattern(patternId, { grid: doc.grid, mirrored: doc.mirrored, name: docName.trim() || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', fullBoard });
-      setError(ok ? '' : '浏览器空间满了，刚才的修改没存进收藏。到「我的收藏」删掉几张，或先导出备份。');
+      setError(ok ? '' : platform.copy.storageFull('刚才的修改没存进收藏'));
     };
     pendingStore.current = save;
     const timer = window.setTimeout(save, 500);
@@ -228,12 +229,12 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       if (bg) {
         if (cut.current?.for !== image) {
           setProgress('正在识别主体…');
-          const result = await cutout(image, () => setProgress('首次使用，正在加载抠图模型（约 10MB，只需一次）…'), { allowModel: !pixelArt });
+          const result = await cutout(image, () => setProgress(platform.copy.cutoutLoading), { allowModel: !!platform.cutoutModel && !pixelArt });
           if (id !== requestId.current) return;
           cut.current = { for: image, result };
         }
         mask = cut.current.result.mask;
-        if (cut.current.result.method === 'failed') note = '没找到明显的主体，已保留背景。';
+        if (cut.current.result.method === 'failed') note = platform.copy.cutoutFailed;
       }
       setProgress('正在生成图纸…');
       await new Promise(r => setTimeout(r, 0));
@@ -346,10 +347,13 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       setProgress('');
       return;
     }
+    // 先框一下要的部分（默认整张，直接点「生成图纸」就是不裁）；点取消就不换图
+    const crop = await askCrop(file);
+    if (crop === 'cancel') return;
     setBusy(true);
     setProgress('正在读取图片…');
     try {
-      const { image, previewUrl, pixelArt, original } = await loadImage(file);
+      const { image, previewUrl, pixelArt, original } = await loadImage(file, crop);
       const src = { image, previewUrl, name: file.name, pixelArt, original };
       setSource(src);
       setHistory(null);
@@ -439,7 +443,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     if (!history) return;
     const doc = history.present;
     const id = createPattern({ name: nameNow || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, tags: opened?.tags, libId: opened?.libId });
-    if (!id) setError('浏览器空间满了，收藏不进去。到「我的收藏」删掉几张，或先导出备份。');
+    if (!id) setError(platform.copy.storageFull('收藏不进去'));
     setPatternId(id);
   };
   // 手动起了名就是想留着：没收藏的顺手收进「我的收藏」，之后改名、改图都跟着存
@@ -484,8 +488,8 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
           {draftOffer && !busy && !pending && (
             <div className="draft-offer" role="status">
               <span>上次还有一张没收藏的图纸{draftOffer.name !== '未命名' ? `「${draftOffer.name}」` : ''}，要接着改吗？</span>
-              <button className="btn primary pill small" onClick={() => resumeDraft(draftOffer)}>接着改</button>
               <button className="btn link small" onClick={() => { clearDraft(); setDraftOffer(null); }}>不用</button>
+              <button className="btn primary pill small" onClick={() => resumeDraft(draftOffer)}>接着改</button>
             </div>
           )}
         </header>
@@ -494,8 +498,8 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
             {sizeSeg}
             <p>已选好图片：<b>{pending.name}</b></p>
             <div className="pending-actions">
-              <button className="btn primary pill" onClick={() => { const f = pending; setPending(null); void openFile(f); }}>生成图纸</button>
               <button className="btn link" onClick={() => { setPending(null); pick(); }}>换一张</button>
+              <button className="btn primary pill" onClick={() => { const f = pending; setPending(null); void openFile(f); }}>生成图纸</button>
             </div>
           </div>
         ) : (
@@ -511,7 +515,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
               const { file, draft: d } = draftAsk;
               setDraftAsk(null);
               if (!createPattern({ name: d.name, size: d.size, style: d.style, fullBoard: d.fullBoard, mirrored: d.mirrored, grid: d.grid })) {
-                setError('浏览器空间满了，草稿没收藏进去。到「我的收藏」删掉几张，或先导出备份。');
+                setError(platform.copy.storageFull('草稿没收藏进去'));
                 return;
               }
               setDraftOffer(null);
@@ -587,6 +591,7 @@ function ReplaceAsk({ title, body, onSave, onReplace, onCancel }: { title: strin
   const primary = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     dialog.current?.showModal();
+    (document.activeElement as HTMLElement | null)?.blur();
     primary.current?.focus(); // showModal 会把焦点给第一个按钮（取消），改成给主按钮
   }, []);
   return (

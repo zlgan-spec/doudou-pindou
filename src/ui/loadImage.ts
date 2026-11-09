@@ -1,19 +1,14 @@
-// 读取用户选的图片：HEIC 先转成 PNG，再缩到最长边 1024 像素以内（更大没有意义，只会更慢、更占内存）。
+// 读取用户选的图片：先交给渠道解码（网站版 HEIC 转 PNG），再缩到最长边 1024 像素以内（更大没有意义，只会更慢、更占内存）。
+import { platform } from '@platform';
 import type { RgbaImage } from '../core/image';
 import { stripChecker } from '../core/checker';
 import { detectPixelGrid, resampleOnGrid } from '../core/pixelgrid';
+import type { CropRect } from './Cropper';
 
 const MAX_SIDE = 1024;
 
 export function isHeic(file: File): boolean {
   return /\.(heic|heif)$/i.test(file.name) || /heic|heif/i.test(file.type);
-}
-
-async function toDecodableBlob(file: File): Promise<Blob> {
-  if (!isHeic(file)) return file;
-  const { default: heic2any } = await import('heic2any');
-  const out = await heic2any({ blob: file, toType: 'image/png' });
-  return Array.isArray(out) ? out[0] : out;
 }
 
 export interface LoadedImage {
@@ -48,20 +43,24 @@ async function headerSize(file: File): Promise<[number, number] | null> {
   return null;
 }
 
-export async function loadImage(file: File): Promise<LoadedImage> {
+/** crop：用户框出的部分（占原图的比例）；先按原图分辨率裁，再缩到最长边 1024 */
+export async function loadImage(file: File, crop?: CropRect | null): Promise<LoadedImage> {
   if (file.size > MAX_FILE_BYTES) throw new FileTooLargeError('图片太大');
   const dims = await headerSize(file);
   if (dims && dims[0] * dims[1] > MAX_PIXELS) throw new FileTooLargeError('图片像素太多');
-  const blob = await toDecodableBlob(file);
+  const blob = await platform.decodeImage(file);
   const bitmap = await createImageBitmap(blob);
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const sx = crop ? Math.round(crop.x * bitmap.width) : 0, sy = crop ? Math.round(crop.y * bitmap.height) : 0;
+  const sw = crop ? Math.max(1, Math.min(bitmap.width - sx, Math.round(crop.w * bitmap.width))) : bitmap.width;
+  const sh = crop ? Math.max(1, Math.min(bitmap.height - sy, Math.round(crop.h * bitmap.height))) : bitmap.height;
+  const scale = Math.min(1, MAX_SIDE / Math.max(sw, sh));
+  const width = Math.max(1, Math.round(sw * scale));
+  const height = Math.max(1, Math.round(sh * scale));
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-  ctx.drawImage(bitmap, 0, 0, width, height);
+  ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, width, height);
   bitmap.close();
   const { data } = ctx.getImageData(0, 0, width, height);
   const full: RgbaImage = { width, height, data };

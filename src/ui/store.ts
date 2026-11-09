@@ -1,5 +1,6 @@
 // 我的收藏：用户点了「收藏」的图纸，存在当前浏览器的 localStorage 里。
 // 存的是格子表格（几十 KB），打开能继续编辑；收藏之后的编辑自动跟着存。可以导出 / 导入 JSON 备份。
+import { platform } from '@platform';
 import type { SizeId, StyleId } from '../core/config';
 import type { Grid } from '../core/grid';
 import { colorOf } from '../core/palette';
@@ -26,7 +27,7 @@ const listeners = new Set<() => void>();
 
 function read(): PatternEntry[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = platform.storage.getItem(KEY);
     if (!raw) return [];
     const data = JSON.parse(raw);
     return Array.isArray(data) ? data.map(toEntry).filter(isEntry).map(e => (e.thumb ? e : { ...e, thumb: makeThumb(e.grid) })) : [];
@@ -39,7 +40,7 @@ function read(): PatternEntry[] {
 function write(entries: PatternEntry[]): boolean {
   let ok = true;
   try {
-    localStorage.setItem(KEY, JSON.stringify(entries));
+    platform.storage.setItem(KEY, JSON.stringify(entries));
   } catch {
     ok = false;
   }

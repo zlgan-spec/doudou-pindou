@@ -1,19 +1,25 @@
-// 壳子：顶部导航（做豆图 / 图纸库 / 我的收藏 / 色卡库 + GitHub），下面是当前页。
+// 壳子：顶部导航（做豆图 / 图纸库 / 我的收藏 / 色卡库），下面是当前页。渠道有的话再加深浅色切换和仓库链接。
 // 路由用 hash（#/、#/make、#/patterns、#/mine、#/colors），纯静态托管不用配置。
-import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
-import { flushSync } from 'react-dom';
+import { platform } from '@platform';
+import { useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { createPortal, flushSync } from 'react-dom';
+import type { Note } from '../platform/types';
 import { Colors } from './Colors';
-import { loadDraft } from './draft';
+import { clearDraft, loadDraft } from './draft';
+import { createPattern } from './store';
 import { Generator } from './Generator';
 import { Home } from './Home';
 import { Logo } from './Logo';
 import { TopNav } from './TopNav';
 import { imageFromPaste } from './paste';
+import { NoteToast, toastHost } from './NoteToast';
+import { CropHost } from './Cropper';
 import { Patterns } from './Patterns';
 import { Terms } from './Terms';
 import type { PatternEntry } from './store';
 
 type Route = 'home' | 'make' | 'patterns' | 'mine' | 'colors' | 'terms';
+const NO_NOTE: Note = { text: '' };
 
 // 手机上顶栏放不下四个字的「我的收藏」，「我的」在窄屏藏起来只显示「收藏」
 const NAV: Array<{ id: Route; hash: string; label: ReactNode }> = [
@@ -22,7 +28,6 @@ const NAV: Array<{ id: Route; hash: string; label: ReactNode }> = [
   { id: 'mine', hash: '#/mine', label: <><span className="nav-extra">我的</span>收藏</> },
   { id: 'colors', hash: '#/colors', label: '色卡库' },
 ];
-const REPO = 'https://github.com/zlgan-spec/doudou-pindou';
 
 function parse(hash: string): Route {
   if (hash.startsWith('#/make')) return 'make';
@@ -34,36 +39,37 @@ function parse(hash: string): Route {
   return 'home';
 }
 
-export function App() {
-  const [route, setRoute] = useState(() => parse(window.location.hash));
-  // 条款页左上角「← 返回」回到进来之前的那一页；直接打开条款链接时回首页
-  const [backHash, setBackHash] = useState('#/');
-  // 从图纸库打开的那一份；带一个编号，打开同一份两次也会重新挂载
-  const [opened, setOpened] = useState<{ entry: PatternEntry; from: 'store' | 'library'; n: number } | null>(null);
-  // 首页上传的图片，交给做拼豆页处理
-  const [incoming, setIncoming] = useState<{ file: File; n: number } | null>(null);
-  const [scrolled, setScrolled] = useState(false);
-  // 深浅色：默认跟系统，手动切过就记住
+/** 深浅色：能切换的渠道默认跟系统、手动切过就记住；不能的只跟系统 */
+function useTheme(): [boolean, (ev: ReactMouseEvent<HTMLButtonElement>) => void] {
   const [dark, setDark] = useState(() => {
-    try {
-      const saved = localStorage.getItem('bead-theme');
-      if (saved) return saved === 'dark';
-    } catch { /* 读不到就跟系统 */ }
+    if (platform.caps.themeToggle) {
+      try {
+        const saved = platform.storage.getItem('bead-theme');
+        if (saved) return saved === 'dark';
+      } catch { /* 读不到就跟系统 */ }
+    }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
   }, [dark]);
+  useEffect(() => {
+    if (platform.caps.themeToggle) return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => setDark(mq.matches);
+    mq.addListener(apply);
+    return () => mq.removeListener(apply);
+  }, []);
   // 切换深浅色：新主题以点击位置为圆心、边缘柔和地向外扩散铺满整页（View Transitions + CSS 遮罩，不复制页面、不加覆盖层）。
   // 键盘触发时圆心在按钮中心；浏览器不支持或开了「减少动态效果」就直接切
-  const toggleTheme = (ev: ReactMouseEvent<HTMLButtonElement>) => {
+  const toggle = (ev: ReactMouseEvent<HTMLButtonElement>) => {
     const next = !dark;
     const apply = () => {
       document.documentElement.classList.toggle('dark', next);
       flushSync(() => setDark(next));
     };
     try {
-      localStorage.setItem('bead-theme', next ? 'dark' : 'light');
+      platform.storage.setItem('bead-theme', next ? 'dark' : 'light');
     } catch { /* 存不下就只在本次有效 */ }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduced || typeof document.startViewTransition !== 'function') return apply();
@@ -82,6 +88,24 @@ export function App() {
     t.updateCallbackDone.catch(() => {});
     t.finished.catch(() => {});
   };
+  return [dark, toggle];
+}
+
+export function App() {
+  const [route, setRoute] = useState(() => parse(window.location.hash));
+  // 条款页左上角「← 返回」回到进来之前的那一页；直接打开条款链接时回首页
+  const [backHash, setBackHash] = useState('#/');
+  // 从图纸库打开的那一份；带一个编号，打开同一份两次也会重新挂载
+  const [opened, setOpened] = useState<{ entry: PatternEntry; from: 'store' | 'library'; n: number } | null>(null);
+  // 首页上传的图片，交给做拼豆页处理
+  const [incoming, setIncoming] = useState<{ file: File; n: number } | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [dark, toggleTheme] = useTheme();
+  // 渠道操作的结果（存相册成功 / 没权限）：底部提示条
+  const [note, setNote] = useState<Note>(NO_NOTE);
+  const clearNote = useCallback(() => setNote(NO_NOTE), []);
+  useEffect(() => platform.onNote(setNote), []);
+  useEffect(clearNote, [route, clearNote]); // 换页就收起，不和别的页的提示叠在一起
 
   useEffect(() => {
     const onHash = (e: HashChangeEvent) => {
@@ -100,9 +124,14 @@ export function App() {
   }, []);
 
   const open = (entry: PatternEntry, from: 'store' | 'library') => {
-    // 还存着没收藏的草稿：拿去改的图纸会顶掉它，打开收藏也会清掉它，先问一句
+    // 还有没收藏的草稿：先悄悄存进「我的收藏」再打开，不弹确认框，也不会丢图
     const draft = loadDraft();
-    if (draft && !window.confirm(`上次没收藏的图纸${draft.name !== '未命名' ? `「${draft.name}」` : ''}会被替换，找不回来了。继续吗？`)) return;
+    if (draft) {
+      const { savedAt: _savedAt, ...data } = draft;
+      void _savedAt;
+      createPattern(data);
+      clearDraft();
+    }
     setOpened(o => ({ entry, from, n: (o?.n ?? 0) + 1 }));
     window.location.hash = '#/make';
   };
@@ -125,6 +154,7 @@ export function App() {
     window.location.hash = '#/make';
   };
 
+  const Host = platform.Host;
   return (
     <div className={`app page-${route}`}>
       <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
@@ -143,15 +173,19 @@ export function App() {
             {/* 做豆图页：图纸名字（点了就能改）和收藏 / 导入 / 下载放在一起（编辑器渲染进来），别的页面是空的 */}
             <div id="page-title" className="page-title" />
             <div id="page-actions" className="page-actions" />
-            <button className="theme-toggle" onClick={toggleTheme} aria-label={dark ? '切换到浅色' : '切换到深色'} title={dark ? '浅色' : '深色'}>
-              {dark
-                ? <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-                : <svg viewBox="0 0 24 24" aria-hidden><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>}
-            </button>
-            <a className="btn soft pill github" href={REPO} target="_blank" rel="noreferrer">
-              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
-              GitHub
-            </a>
+            {platform.caps.themeToggle && (
+              <button className="theme-toggle" onClick={toggleTheme} aria-label={dark ? '切换到浅色' : '切换到深色'} title={dark ? '浅色' : '深色'}>
+                {dark
+                  ? <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+                  : <svg viewBox="0 0 24 24" aria-hidden><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>}
+              </button>
+            )}
+            {platform.copy.repoUrl && (
+              <a className="btn soft pill github" href={platform.copy.repoUrl} target="_blank" rel="noreferrer">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
+                GitHub
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -169,11 +203,18 @@ export function App() {
         {route === 'terms' && <Terms backHash={backHash} />}
         <footer className="frame-row foot">
           <div className="cell foot-in">
-            <p className="fine">色号整理自公开 MARD 色卡 · 抠图 U²-Netp（Apache-2.0）· 像素字体 Fusion Pixel（OFL）· MIT 开源 · <a href={REPO} target="_blank" rel="noreferrer">GitHub</a> · <a href="#/terms">用户协议</a></p>
+            <p className="fine">{platform.copy.footer}</p>
           </div>
         </footer>
       </main>
-
+      {/* 图纸库 / 收藏的大图开着时（模态窗口），提示条渲染进大图里，不然被它的遮罩盖住、按钮点不到 */}
+      {(() => {
+        const toast = <NoteToast note={note.text} actions={note.actions} onDone={clearNote} />;
+        const host = note.text ? toastHost() : null;
+        return host ? createPortal(toast, host) : toast;
+      })()}
+      {Host && <Host />}
+      <CropHost />
     </div>
   );
 }

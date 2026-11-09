@@ -1,4 +1,5 @@
 // 新手引导：第一次进编辑器时，别处变暗、只亮一块，一个分区一句话：右上角文件操作 → 色号清单 → 工具栏 → 右下角看图。看过（或跳过）一次就不再自动出现，点顶栏的「?」重看
+import { platform } from '@platform';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -9,10 +10,10 @@ const CARD_H = 172; // 说明卡大概多高（两行字），放上下时按它
 
 // 目标用 data-guide 标在元素上（Editor 里），改布局不用改这里；同名的几个元素合成一块亮
 const STEPS: Array<{ target: string; text: string }> = [
-  { target: 'file', text: '为图纸命名、收藏 / 导入 / 下载图纸' },
-  { target: 'beads', text: '颜色功能区，点击颜色右侧 ⋯ 可替换或删除颜色' },
+  { target: 'file', text: `为图纸命名、收藏 / 导入 / ${platform.copy.exportLabel}` },
+  { target: 'beads', text: '点颜色只看这一色，再点一下取消；长按颜色可替换或删除' },
   { target: 'tools', text: '图纸具体的修改功能，可进行 DIY 绘制' },
-  { target: 'view', text: '切换不同视图，包括网格、放大缩小、全屏等' },
+  { target: 'view', text: '双指放大缩小、拖动图纸；点网格按钮切换视图，点 ? 再看一遍引导' },
 ];
 
 /** 同一步的几个元素合成一个框；不在同一行的（手机上名字在图纸上方、按钮在底部）只取和最后一个同一行的 */
@@ -27,7 +28,7 @@ function targetRect(els: HTMLElement[]): DOMRect | null {
 
 function seen(): boolean {
   try {
-    return localStorage.getItem(KEY) === '1';
+    return platform.storage.getItem(KEY) === '1';
   } catch {
     return true; // 存储用不了（无痕模式等）：不打扰
   }
@@ -35,7 +36,7 @@ function seen(): boolean {
 
 function markSeen() {
   try {
-    localStorage.setItem(KEY, '1');
+    platform.storage.setItem(KEY, '1');
   } catch {
     /* 存不了就只在这次不再出现 */
   }
@@ -83,7 +84,9 @@ export function Guide({ replay = 0 }: { replay?: number }) {
     // 滚到屏幕中间：贴着顶部会被吸顶的导航栏挡住（手机上工具栏就在图纸上方）
     const r0 = el.getBoundingClientRect();
     const sticky = el.closest('.topbar, .page-actions'); // 顶栏、手机底部按钮条本来就固定在屏幕上，不用滚
-    if (!sticky && (r0.top < 80 || r0.bottom > window.innerHeight - 16)) el.scrollIntoView({ block: 'center', inline: 'nearest' });
+    // 只有真的在屏幕外才滚；手机编辑器一屏放下，贴着底边的色块条不用滚（滚了会把整页顶上去）
+    const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--top-inset')) || 0;
+    if (!sticky && (r0.top < Math.max(0, inset) || r0.bottom > window.innerHeight)) el.scrollIntoView({ block: 'center', inline: 'nearest' });
     const measure = () => setRect(targetRect(els));
     // 目标刚出现时还在播入场动画、滚动也要一会儿：头一秒每帧都量，跟上它停下来的位置
     const until = performance.now() + 1000;

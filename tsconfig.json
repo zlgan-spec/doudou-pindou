@@ -11,7 +11,8 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "paths": { "@platform": ["./src/platform/web/index.ts"] }
   },
   "include": ["src", "tests", "vite.config.ts"]
 }

@@ -1,4 +1,5 @@
 // 图纸库（整理好的现成图纸，public/patterns/index.json）和我的收藏（收藏过的图纸）：顶部导航里各占一个按钮，页面没有页头，打开就是搜索和图纸。
+import { platform } from '@platform';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { contentBounds, type Grid } from '../core/grid';
 import { categoryRank, groupSeries, loadLibrary, sizeOf, type Library as LibraryData, type LibraryPattern } from './library';
@@ -40,7 +41,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
     credit: p.author || p.source ? (
       <>
         {[p.author, p.source].filter(Boolean).join(' · ')}
-        {p.link && <> · <a href={p.link} target="_blank" rel="noreferrer noopener">原图</a></>}
+        {p.link && platform.caps.externalLinks && <> · <a href={p.link} target="_blank" rel="noreferrer noopener">原图</a></>}
       </>
     ) : undefined,
   })), [patterns]);
@@ -87,7 +88,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
       return;
     }
     const e = toEntry(p);
-    setNote(createPattern({ name: e.name, size: e.size, style: e.style, fullBoard: e.fullBoard, mirrored: e.mirrored, grid: e.grid, tags: e.tags, libId: e.libId }) ? '' : '浏览器空间满了，收藏不进去。到「我的收藏」删掉几张，或先导出备份。');
+    setNote(createPattern({ name: e.name, size: e.size, style: e.style, fullBoard: e.fullBoard, mirrored: e.mirrored, grid: e.grid, tags: e.tags, libId: e.libId }) ? '' : platform.copy.storageFull('收藏不进去'));
   };
 
   return (
@@ -103,7 +104,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
           const isStarred = starred.some(e => e.libId === p.id);
           return (
             <>
-              <button className="btn primary pill" onClick={() => downloadSheet({ ...p, size: sizeOf(p.grid) ?? undefined })}>下载图纸</button>
+              <button className="btn primary pill" onClick={() => downloadSheet({ ...p, size: sizeOf(p.grid) ?? undefined })}>{platform.copy.sheetExportLabel}</button>
               <button className="btn pill" aria-pressed={isStarred} onClick={() => toggleStar(p)}>{isStarred ? '已收藏' : '收藏'}</button>
               <button className="btn link" onClick={() => { close(); onOpen(toEntry(p), 'library'); }}>拿去改</button>
             </>

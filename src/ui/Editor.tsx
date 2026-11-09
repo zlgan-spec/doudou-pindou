@@ -1,5 +1,7 @@
 // 图纸查看与编辑：拖动 / 选区 / 画笔 / 取色 / 橡皮 / 填充 / 文字，镜像、降噪，撤销重做，色卡替换和删色，导入导出。
 // 所有操作都只改格子表格，图纸每次从表格重新画，色卡和颗数自然同步。
+import { platform } from '@platform';
+import type { ExportImage } from '../platform/types';
 import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement, type ReactNode } from 'react';
 import { textColorOn } from '../core/color';
@@ -12,8 +14,8 @@ import { boardName, hitCell, hitLegend, renderSheet, renderSheetDiff, sheetLayou
 import { Logo } from './Logo';
 import { Guide } from './Guide';
 import { PalettePicker } from './PalettePicker';
-import { embedPattern, sheetFileName } from './pngData';
-import { makeZip } from './zip';
+import { ScrollBar } from './ScrollBar';
+import { embedPatternDataUrl, sheetFileName } from './pngData';
 import { rasterText, textToBitmap } from './text';
 import { RefWindow, type CellPoint, type CellRect } from './RefWindow';
 import { takeCopiedColor } from './handoff';
@@ -247,6 +249,20 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   // padX / padY：放大后图纸四周多出来的灰色空间，边缘也能拖到工具栏外面、拖到视野中间来改
   const [fit, setFit] = useState<{ scale: number; w: number; h: number; padX: number; padY: number } | null>(null);
   const natural = useMemo(() => sheetLayout(doc.grid), [doc.grid]);
+  // 手机上屏幕小：编辑时不显示图纸顶上的署名规格和底下的色卡（底部色块条已经有了），只留网格和坐标；存相册时照原样画
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 860px)');
+    const on = () => setNarrow(mq.matches);
+    mq.addListener(on);
+    return () => mq.removeListener(on);
+  }, []);
+  const crop = useMemo(() => {
+    if (!narrow) return { top: 0, bottom: 0 };
+    const keep = Math.round(natural.pad * 0.4);
+    const gridBottom = natural.gridY + doc.grid.height * natural.cell;
+    return { top: Math.max(0, natural.gridY - natural.band - natural.axis - keep), bottom: Math.max(0, natural.height - (gridBottom + natural.axis + keep)) };
+  }, [narrow, natural, doc.grid.height]);
   // 现在是几号板：按图纸格数算（画到边外豆板会变大），颜色建议、存进 PNG 的尺寸都跟着它
   const board: SizeId = boardFor(doc.grid.width, doc.grid.height) ?? 'large';
 
@@ -258,9 +274,10 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     const railRoom = rail && getComputedStyle(rail).position === 'absolute' ? (rail.offsetWidth + 16) * 2 : 0;
     const css = getComputedStyle(box); // 手机上底部留了放悬浮按钮的内边距，整张放进来时不算这块
     const bw = box.clientWidth - 2 - railRoom, bh = box.clientHeight - 2 - parseFloat(css.paddingTop || '0') - parseFloat(css.paddingBottom || '0');
-    const scale = Math.min(bw / natural.width, bh / natural.height);
-    setFit({ scale, w: natural.width * scale, h: natural.height * scale, padX: Math.round(box.clientWidth * 0.35), padY: Math.round(box.clientHeight * 0.35) });
-  }, [natural.width, natural.height]);
+    const visH = natural.height - crop.top - crop.bottom;
+    const scale = Math.min(bw / natural.width, bh / visH);
+    setFit({ scale, w: natural.width * scale, h: visH * scale, padX: Math.round(box.clientWidth * 0.35), padY: Math.round(box.clientHeight * 0.35) });
+  }, [natural.width, natural.height, crop.top, crop.bottom]);
 
   useEffect(() => {
     measureFit();
@@ -306,12 +323,14 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     const [left, top] = pendingScroll.current ?? [box.scrollLeft, box.scrollTop];
     pendingScroll.current = [(left + ax - ox0) * ratio + ox1 - ax, (top + ay - oy0) * ratio + oy1 - ay];
     setZoom(clamped);
+    setZoomTick(t => t + 1); // 双指时两根手指先后报位置，缩放可能一放一收回到原值：仍要把滚动位置用上
   };
+  const [zoomTick, setZoomTick] = useState(0);
   useLayoutEffect(() => {
     const p = pendingScroll.current, box = viewRef.current;
     pendingScroll.current = null;
     if (p && box) box.scrollTo(p[0], p[1]);
-  }, [zoom]);
+  }, [zoom, zoomTick]);
   // 缩放只作用在查看区，不能让浏览器把整个页面放大：
   // - 触控板捏合 / Ctrl+滚轮：浏览器发的是带 ctrlKey 的 wheel，必须用非 passive 监听才能 preventDefault（React 的 onWheel 是 passive 的）
   // - Safari 还会发 gesture 事件，也要拦
@@ -341,12 +360,14 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     };
     const pointers = new Map<number, [number, number]>();
     let pinchStart: { dist: number; zoom: number } | null = null;
+    let lastMid: [number, number] | null = null; // 两根手指的中点：跟着它平移图纸（手机上双指既能缩放也能拖动）
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
       pointers.set(e.pointerId, [e.clientX, e.clientY]);
       if (pointers.size === 2) {
         const [a, b] = [...pointers.values()];
         pinchStart = { dist: Math.hypot(a[0] - b[0], a[1] - b[1]), zoom: zoomRef.current };
+        lastMid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
         // 第二根手指按下：这次整个手势都算缩放，到手指全部抬起前不画；第一根手指已经预览上去的豆子擦掉
         pinching.current = true;
         stroke.current = null;
@@ -361,12 +382,20 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         const [a, b] = [...pointers.values()];
         const dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
         const rect = box.getBoundingClientRect();
-        zoomToRef.current(pinchStart.zoom * (dist / pinchStart.dist), [(a[0] + b[0]) / 2 - rect.left, (a[1] + b[1]) / 2 - rect.top]);
+        const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        zoomToRef.current(pinchStart.zoom * (dist / pinchStart.dist), [mid[0] - rect.left, mid[1] - rect.top]);
+        if (lastMid) {
+          const dx = mid[0] - lastMid[0], dy = mid[1] - lastMid[1];
+          const p = pendingScroll.current;
+          if (p) pendingScroll.current = [p[0] - dx, p[1] - dy];
+          else box.scrollBy(-dx, -dy);
+        }
+        lastMid = mid;
       }
     };
     const onUp = (e: PointerEvent) => {
       pointers.delete(e.pointerId);
-      if (pointers.size < 2) pinchStart = null;
+      if (pointers.size < 2) { pinchStart = null; lastMid = null; }
       if (!pointers.size) window.setTimeout(() => { pinching.current = false; }, 0); // 等这次抬手的事件都处理完再恢复
     };
     window.addEventListener('wheel', onWheel, { passive: false });
@@ -387,6 +416,10 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     };
   }, []);
   const sheetStyle = fit ? { width: fit.w * zoom, height: fit.h * zoom } : undefined;
+  // 画布照整张图纸的大小画，往上挪掉裁掉的那截；外面的裁切层只露出网格这一块
+  const cropK = fit ? fit.scale * zoom : 0;
+  const canvasStyle = fit ? { width: fit.w * zoom, height: natural.height * cropK, marginTop: -crop.top * cropK } : undefined;
+  const overlayStyle = fit ? { left: 0, top: -crop.top * cropK, width: fit.w * zoom, height: natural.height * cropK } : undefined;
 
   // 清晰画布画的是哪一块（版式坐标）：看得见的范围四周多留 30%，滚动、缩放时超出了才换一块重画
   const [detail, setDetail] = useState<{ x: number; y: number; w: number; h: number; zoom: number } | null>(null);
@@ -428,7 +461,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   }, [updateDetail]);
   const detailK = fit ? fit.scale * zoom : 0; // 屏幕上一个版式单位多宽
   const detailStyle = detail && detail.zoom === zoom
-    ? { left: detail.x * detailK, top: detail.y * detailK, width: detail.w * detailK, height: detail.h * detailK }
+    ? { left: detail.x * detailK, top: (detail.y - crop.top) * detailK, width: detail.w * detailK, height: detail.h * detailK }
     : { display: 'none' };
 
   // 全屏：图纸区铺满屏幕、整张放进来；再点一次或按 Esc 退出。浏览器不支持真全屏时就铺满窗口
@@ -436,12 +469,12 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const enterFull = () => {
     setFull(true);
     setZoom(1);
-    document.documentElement.requestFullscreen?.().catch(() => { /* 不支持就只铺满窗口 */ });
+    platform.fullscreen?.enter();
   };
   const exitFull = () => {
     setFull(false);
     setZoom(1);
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    platform.fullscreen?.exit();
   };
   useEffect(() => {
     const onChange = () => { if (!document.fullscreenElement) { setFull(false); setZoom(1); } }; // 浏览器自己按 Esc 退出的
@@ -483,7 +516,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   // 色号清单可以收起成一列色块，把位置让给图纸；记在浏览器里
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      return localStorage.getItem('bead-list-collapsed') === '1';
+      return platform.storage.getItem('bead-list-collapsed') === '1';
     } catch {
       return false;
     }
@@ -491,7 +524,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const toggleCollapsed = () => {
     setCollapsed(c => {
       try {
-        localStorage.setItem('bead-list-collapsed', c ? '0' : '1');
+        platform.storage.setItem('bead-list-collapsed', c ? '0' : '1');
       } catch { /* 存不下就只在本次有效 */ }
       return !c;
     });
@@ -503,13 +536,50 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   // 清单里选中的颜色就是画笔颜色（只有一个「当前颜色」）。变淡只在「看 / 清理」的工具里用：
   // 拖动、选区、取色、橡皮时点颜色 = 只看这一色；画笔、填充时点颜色 = 换画笔颜色，不变淡，看得到整张图才好画
   const painting = tool === 'brush' || tool === 'fill';
-  const dim = useMemo(() => (focus && !painting ? new Set(legend.map(l => l.code).filter(c => c !== focus)) : undefined), [focus, legend, painting]);
+  // 文字工具在放字，也要看得到整张图，不变淡
+  const viewing = !painting && tool !== 'text';
+  const dim = useMemo(() => (focus && viewing ? new Set(legend.map(l => l.code).filter(c => c !== focus)) : undefined), [focus, legend, viewing]);
   const pickFromList = (code: string) => {
     setColor(code);
-    if (painting) setFocus(code); // 记住选中的是哪个，切回拖动时接着只看这一色
-    else setFocus(f => (f === code ? null : code));
+    // 画笔、填充时点颜色只是换画笔颜色；不记成「只看这一色」，不然换到别的工具整张图会突然变淡
+    if (!painting) setFocus(f => (f === code ? null : code));
   };
   const listSelected = painting ? color : focus;
+  // 色块：点一下用它 / 只看它，再点一下取消；长按（手机上的「更多操作」习惯）打开替换、删掉
+  const longTimer = useRef(0);
+  const longPressed = useRef(false);
+  const longStart = useRef<[number, number] | null>(null);
+  const eatClick = useRef<((ev: Event) => void) | null>(null);
+  // 抬手后有的手机会补发一次点击、有的不发：抬手 0.1 秒后就不再拦，免得吞掉卡片上的真点击
+  const stopEating = () => {
+    const eat = eatClick.current;
+    if (!eat) return;
+    eatClick.current = null;
+    window.setTimeout(() => document.removeEventListener('click', eat, true), 100);
+  };
+  const longPress = (code: string) => ({
+    onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+      longPressed.current = false;
+      longStart.current = [e.clientX, e.clientY];
+      window.clearTimeout(longTimer.current);
+      longTimer.current = window.setTimeout(() => {
+        longPressed.current = true;
+        setCard(code);
+        // 卡片弹出时手指还按着：抬手那一下的点击会落在卡片的遮罩上把它关掉，吞掉这一下
+        const eat = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); };
+        eatClick.current = eat;
+        document.addEventListener('click', eat, { capture: true, once: true });
+      }, 450);
+    },
+    onPointerMove: (e: ReactPointerEvent<HTMLElement>) => {
+      const p = longStart.current;
+      if (p && Math.hypot(e.clientX - p[0], e.clientY - p[1]) > 8) window.clearTimeout(longTimer.current); // 在滑色块条，不算长按
+    },
+    onPointerUp: () => { window.clearTimeout(longTimer.current); stopEating(); },
+    onPointerCancel: () => { window.clearTimeout(longTimer.current); stopEating(); },
+    onPointerLeave: () => window.clearTimeout(longTimer.current),
+  });
+  useEffect(() => () => window.clearTimeout(longTimer.current), []);
 
   // 表格一变、看法一变、缩放停下来，就按当前需要的清晰度重画图纸。
   // 只是改了几颗豆（看法没变）：只重画改过的格子和实时预览涂过的格子，大图不用整张重画
@@ -1027,7 +1097,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         return;
       }
       // F：进入 / 退出全屏（和看视频、看图软件的习惯一样）
-      if (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (platform.fullscreen && e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         toggleFullRef.current();
         return;
@@ -1065,49 +1135,34 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   // 保存：另画一张不带拼豆模式淡化的图纸，并把格子表格写进 PNG，以后拖回来能继续编辑
   // 导出：另画一张不带拼豆模式淡化、网格完整的图纸，并把格子表格写进 PNG，以后拖回来能继续编辑
   // 导出清晰度：每格 48～72 像素，看图软件里放大也清楚；104 板用 1.5 倍，更大的用 1 倍（每格 32 像素），免得导出等太久
-  const EXPORT_SCALE = (w: number) => (w > 104 ? 1 : w > 80 ? 1.5 : 2);
-  const [exporting, setExporting] = useState(false);
-  const toBlob = (c: HTMLCanvasElement) => new Promise<Blob | null>(resolve => c.toBlob(resolve, 'image/png'));
-  const download = (blob: Blob, fileName: string) => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = fileName;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  };
-  // 超过一块 104 板：打成一个压缩包，一张总览（能拖回来接着改）+ 每块板一张（只画这块板，色号和颗数也只算这块），拼一块看一张
-  const exportBoards = async (data: Parameters<typeof embedPattern>[1]) => {
+  // 存相册：打开预览，图在预览里画好（同步），用户点「存相册」时直接调平台接口
+  // 超过一块 104 板：一张总览（能导回来接着改）+ 每块板一张（只画这块板，色号和颗数也只算这块），拼一块看一张
+  const buildImages = (codes: boolean): ExportImage[] => {
     const { grid, mirrored } = doc;
+    const data = { name: name.trim() || '未命名', size: board, style, fullBoard, mirrored, grid };
+    const fileName = sheetFileName(name, mirrored);
+    if (boardFor(grid.width, grid.height)) {
+      const url = renderSheet(grid, { mirrored, scale: platform.exportScale(grid), title: name, codes }).toDataURL('image/png');
+      return [{ name: fileName, url: embedPatternDataUrl(url, data) }];
+    }
     const L = sheetLayout(grid);
-    const s = Math.min(1, Math.sqrt(40e6 / (L.width * L.height))); // 总览太大浏览器画不出来，按总像素缩小；缩到色号看不清就不写色号
-    const overview = await toBlob(renderSheet(grid, { mirrored, scale: s, codes: s >= 0.75, title: name }));
-    if (!overview) return;
-    const files = [{ name: '总览.png', data: new Uint8Array(await (await embedPattern(overview, data)).arrayBuffer()) }];
+    const s = Math.min(1, 2400 / Math.max(L.width, L.height)); // 总览只用来看全貌：长边约 2400，色号看不清就不写（每块板那张有色号）
+    const out: ExportImage[] = [{ name: '总览.png', url: embedPatternDataUrl(renderSheet(grid, { mirrored, scale: s, codes: codes && s >= 0.75, title: name }).toDataURL('image/png'), data) }];
     const B = SIZES.large.board, { cols, rows } = boardTiles(grid.width, grid.height);
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const part: Grid = { width: B, height: B, cells: new Array(B * B).fill(null) };
       for (let y = 0; y < B; y++) for (let x = 0; x < B; x++) part.cells[y * B + x] = grid.cells[(r * B + y) * grid.width + c * B + x] ?? null;
       if (!part.cells.some(Boolean)) continue; // 空板不用拼
       const id = boardName(r, c);
-      const blob = await toBlob(renderSheet(part, { mirrored, scale: EXPORT_SCALE(B), title: name.trim() ? `${name.trim()} · ${id}` : id }));
-      if (blob) files.push({ name: `${id}.png`, data: new Uint8Array(await blob.arrayBuffer()) });
+      out.push({ name: `${id}.png`, url: renderSheet(part, { mirrored, scale: platform.exportScale(part), codes, title: name.trim() ? `${name.trim()} · ${id}` : id }).toDataURL('image/png') });
     }
-    download(makeZip(files), sheetFileName(name, mirrored).replace(/\.png$/, '.zip'));
+    return out;
   };
+  const [exporting, setExporting] = useState(false);
   const save = () => {
     if (exporting) return;
     setExporting(true);
-    const data = { name: name.trim() || '未命名', size: board, style, fullBoard, mirrored: doc.mirrored, grid: doc.grid };
-    // 让「正在下载」先显示出来再开始画（大图要一两秒）
-    window.setTimeout(async () => {
-      try {
-        if (!boardFor(doc.grid.width, doc.grid.height)) return await exportBoards(data);
-        const blob = await toBlob(renderSheet(doc.grid, { mirrored: doc.mirrored, scale: EXPORT_SCALE(doc.grid.width), title: name }));
-        if (blob) download(await embedPattern(blob, data), sheetFileName(name, doc.mirrored));
-      } finally {
-        setExporting(false);
-      }
-    }, 30);
+    void platform.exportSheet({ title: name.trim() || '未命名豆图', fileName: sheetFileName(name, doc.mirrored), build: buildImages }).finally(() => setExporting(false));
   };
 
   // 原图对照：半透明叠在图纸上，只在屏幕上看，不进导出
@@ -1203,12 +1258,22 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     setDenoised(null);
     apply(next);
   };
+  // 手机上滑块松手时 pointerup 常被换成 pointercancel 或不发：停下 0.25 秒也自动生效，不用等下一次操作
+  const commitRef = useRef(commitColors);
+  commitRef.current = commitColors;
+  const commitTimer = useRef(0);
+  const commitNow = () => { window.clearTimeout(commitTimer.current); commitRef.current(); };
+  const commitSoon = () => { window.clearTimeout(commitTimer.current); commitTimer.current = window.setTimeout(() => commitRef.current(), 250); };
+  useEffect(() => () => window.clearTimeout(commitTimer.current), []);
   const undoMerge = () => {
     if (!merged) return;
     restore(merged.changes);
     setMerged(null);
     setTarget(null);
   };
+
+  // 手机底部色块条放不下时，下面显示一条细滚动条，看得出还能往右拉
+  const stripRef = useRef<HTMLUListElement>(null);
 
   // 「图片调整」浮层：点外面、按 Esc 就关
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -1424,7 +1489,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     <section className={`result ${collapsed ? 'list-collapsed' : ''}`}>
       {active && (
         <div className={`toast has-action ${handoff || growNote || notice ? 'show' : ''} ${!handoff && !growNote && notice ? 'notice' : ''}`} role="status" aria-live="polite">
-          {handoff && <><span>画笔已换成刚复制的 <b>{handoff.code}</b>，直接画吧</span><button onClick={undoHandoff}>不用</button></>}
+          {handoff && <><span>画笔已换成刚选的 <b>{handoff.code}</b>，直接画吧</span><button onClick={undoHandoff}>不用</button></>}
           {!handoff && growNote && <span>{growNote}</span>}
           {!handoff && !growNote && notice}
         </div>
@@ -1484,7 +1549,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
             </div>
           )}
           {onImport && <button className="btn soft pill btn-icon" onClick={onImport} title="换一张图，或导入存过的图纸 PNG" data-guide="file">{ICON.import}导入</button>}
-          <button className="btn primary pill btn-icon" onClick={save} disabled={exporting} title="下载高清图纸 PNG，拖回来能接着改" data-guide="file">{ICON.export}{exporting ? '正在下载…' : '下载'}</button>
+          <button className="btn primary pill btn-icon" onClick={save} disabled={exporting} title={platform.copy.exportTitle} data-guide="file">{ICON.export}{exporting ? platform.copy.exportingLabel : platform.copy.exportLabel}</button>
           {/* 重看新手引导：和深浅色切换同一个圆形按钮 */}
           <button className="theme-toggle" onClick={() => setGuideRun(n => n + 1)} aria-label="使用引导" title="使用引导">{ICON.help}</button>
         </>,
@@ -1492,6 +1557,8 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       )}
 
       <div className={`sheet-stage ${full ? 'full' : ''}`}>
+        {/* 统一的细滚动条：图纸放大后横竖各一条，工具栏放不下时一条 */}
+        {narrow && <><ScrollBar target={viewRef} axis="x" inside deps={[zoom]} /><ScrollBar target={viewRef} axis="y" deps={[zoom]} /><ScrollBar target={railRef} axis="x" inside /></>}
       <div
         ref={viewRef}
         className={`sheet-view ${zoom > 1 ? 'zoomed' : ''} tool-${tool}`}
@@ -1504,13 +1571,15 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       >
         <div className="sheet-pad" style={zoom > 1 && fit ? { padding: `${fit.padY}px ${fit.padX}px` } : undefined}>
         <div className="sheet-wrap" style={sheetStyle}>
-          <canvas ref={canvasRef} className={`sheet ${editing ? 'editing' : ''} ${penMode ? 'pen-mode' : ''}`} style={sheetStyle} aria-label="拼豆图纸" />
-          <canvas ref={detailRef} className="sheet-detail" style={detailStyle} aria-hidden />
-          <canvas ref={overlayRef} className={`sheet-overlay ${editing ? '' : 'hidden'}`} />
+          <div className="sheet-clip">
+            <canvas ref={canvasRef} className={`sheet ${editing ? 'editing' : ''} ${penMode ? 'pen-mode' : ''}`} style={canvasStyle} aria-label="拼豆图纸" />
+            <canvas ref={detailRef} className="sheet-detail" style={detailStyle} aria-hidden />
+            <canvas ref={overlayRef} className={`sheet-overlay ${editing ? '' : 'hidden'}`} style={overlayStyle} />
+          </div>
           {tool === 'select' && (float || sel) && !selDragging && fit && (() => {
             const k = (fit.w * zoom) / natural.width;
             const box = float ? floatRect(float) : sel!; // 刚框好的选区也有四个角，拖角直接缩放
-            const style = { left: (natural.gridX + box.x * natural.cell) * k, top: (natural.gridY + box.y * natural.cell) * k, width: box.w * natural.cell * k, height: box.h * natural.cell * k };
+            const style = { left: (natural.gridX + box.x * natural.cell) * k, top: (natural.gridY - crop.top + box.y * natural.cell) * k, width: box.w * natural.cell * k, height: box.h * natural.cell * k };
             const handle = (c: Corner | 'move' | 'rotate') => ({ onPointerDown: (e: ReactPointerEvent<HTMLElement>) => onHandleDown(e, c), onPointerMove: onHandleMove, onPointerUp: onHandleUp, onPointerCancel: onHandleUp });
             return (
               <div className="float-box" style={style}>
@@ -1528,12 +1597,12 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
             const r = float ? floatRect(float) : sel!;
             const k = (fit.w * zoom) / natural.width;
             const left = (natural.gridX + (r.x + r.w / 2) * natural.cell) * k;
-            const top = (natural.gridY + r.y * natural.cell) * k;
+            const top = (natural.gridY - crop.top + r.y * natural.cell) * k;
             // 太靠上（图纸顶部，或者页面滚动后会被吸顶导航挡住）就放到下方
             const barBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0;
             const screenTop = (canvasRef.current?.getBoundingClientRect().top ?? 0) + top;
             const below = top < 56 || screenTop - 56 < barBottom;
-            const y = below ? (natural.gridY + (r.y + r.h) * natural.cell) * k + 14 + (float?.text ? 40 : 0) : top - 14; // 文字框下面有旋转手柄，按钮再往下让一点
+            const y = below ? (natural.gridY - crop.top + (r.y + r.h) * natural.cell) * k + 14 + (float?.text ? 40 : 0) : top - 14; // 文字框下面有旋转手柄，按钮再往下让一点
             return (
               <div className={`sel-pop ${below ? 'below' : ''}`} style={{ left, top: y }} role="toolbar" aria-label="选区操作">
                 {float ? (
@@ -1643,7 +1712,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         <div className="adjust-pop" ref={adjustRef} role="group" aria-label="图片调整">
           {onToggleRemoveBg && removeBg !== undefined && (
             <button className="switch-row" role="switch" aria-checked={removeBg} onClick={onToggleRemoveBg} disabled={busy} title="会重新生成图纸">
-              <span><b>移除背景</b><small>只拼主体，会重新生成</small></span>
+              <span><b>移除背景</b><small>{platform.copy.removeBgHint}</small></span>
               <i aria-hidden />
             </button>
           )}
@@ -1692,6 +1761,8 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         <button className="float-btn" onClick={() => onHistory(redo(history))} disabled={!history.future.length} title="重做（⇧⌘Z）" aria-label="重做">{ICON.redo}</button>
       </div>
       <div className="float-bar right" data-guide="view">
+        {/* 回看新手引导：和网格按钮同一组、同一个样子 */}
+        <button className="float-btn guide-btn" onClick={() => setGuideRun(n => n + 1)} title="使用引导" aria-label="使用引导">{ICON.help}</button>
         <button className="float-btn" onClick={() => setGridView(g => GRID_NEXT[g])} title={`${GRID_LABEL[gridView]}（点一下切换）`} aria-label={GRID_LABEL[gridView]}>
           {ICON[({ all: 'gridAll', major: 'gridMajor', none: 'gridNone', preview: 'gridPreview' } as const)[gridView]]}
         </button>
@@ -1712,13 +1783,15 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
           />
           <button onClick={() => zoomTo(zoom * 1.5)} disabled={zoom >= maxZoom} aria-label="放大">＋</button>
         </div>
-        <button className="float-btn" onClick={full ? exitFull : enterFull} title={full ? '退出全屏（F / Esc）' : '全屏（F）'} aria-label={full ? '退出全屏' : '全屏'} aria-pressed={full}>{full ? ICON.exitFull : ICON.full}</button>
+        {/* 小工具版不放全屏按钮：全屏由小红书容器管 */}
+        {platform.fullscreen && <button className="float-btn" onClick={full ? exitFull : enterFull} title={full ? '退出全屏（F / Esc）' : '全屏（F）'} aria-label={full ? '退出全屏' : '全屏'} aria-pressed={full}>{full ? ICON.exitFull : ICON.full}</button>}
       </div>
       </div>
 
       </div>
 
       <aside className="bead-list" aria-label="色号清单" data-guide="beads">
+        {narrow && <ScrollBar target={stripRef} axis="x" deps={[legend.length]} />}
         <div className="bead-list-head">
           <span className="kicker">色号清单</span>
           <button className="bead-collapse" onClick={toggleCollapsed} aria-expanded={!collapsed} aria-label={collapsed ? '展开色号清单' : '收起色号清单'} title={collapsed ? '展开' : '收起，只看色块'}>
@@ -1727,10 +1800,10 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         </div>
         {/* 表头：最左是俯视的标志（和下面的色块一样是个圆、竖着对齐），「色号」对齐下面的色号文字 */}
         <div className="bead-cols" aria-hidden><Logo size={20} phi={Math.PI / 2} /><span>色号</span><span>用量</span></div>
-        <ul>
+        <ul ref={stripRef}>
           {legend.map(l => (
             <li key={l.code} className={listSelected === l.code ? 'on' : ''}>
-              <button className="bead-row" onClick={() => pickFromList(l.code)} aria-pressed={listSelected === l.code} title={painting ? `用 ${l.code} 画（${l.count} 颗）` : `只看 ${l.code}（${l.count} 颗）`}>
+              <button className="bead-row" onClick={() => { if (longPressed.current) { longPressed.current = false; return; } pickFromList(l.code); }} {...longPress(l.code)} onContextMenu={e => e.preventDefault()} aria-pressed={listSelected === l.code} title={painting ? `用 ${l.code} 画（${l.count} 颗）` : `只看 ${l.code}（${l.count} 颗）`}>
                 <span className="bead-swatch" style={{ background: colorOf(l.code).hex }} />
                 <b>{l.code}</b>
                 <span className="num">{l.count}</span>
@@ -1747,14 +1820,14 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
               <b>{mergeOpen ? targetN : cur}<small>色</small></b>
               <i className="caret" aria-hidden />
             </button>
-            {merged && !mergeOpen && (
+            {merged && !mergeOpen && !narrow && (
               <p className="bead-merge-note">原来 {merged.from} 色<button className="btn link small" onClick={undoMerge}>撤销</button></p>
             )}
             {mergeOpen && (
               <>
                 <div className={`bead-range ${capped ? 'capped' : ''}`}>
                   <input type="range" min={0} max={100} value={toP(targetN)} disabled={busy} aria-label="颜色数量"
-                    onChange={e => setTarget(toN(capped ? Math.min(50, Number(e.target.value)) : Number(e.target.value)))} onPointerUp={commitColors} onKeyUp={commitColors} />
+                    onChange={e => { setTarget(toN(capped ? Math.min(50, Number(e.target.value)) : Number(e.target.value))); commitSoon(); }} onPointerUp={commitNow} onPointerCancel={commitNow} onTouchEnd={commitNow} onKeyUp={commitNow} />
                 </div>
                 {merged && <p className="bead-merge-note">原来 {merged.from} 色<button className="btn link small" onClick={undoMerge}>撤销</button></p>}
               </>
@@ -1805,6 +1878,10 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
             setPicker(null);
           }}
         />
+      )}
+      {/* 手机上从底部升起的面板（颜色数量、豆板尺寸、描边、调整）：后面一层浅遮罩，点别处就收起，这一下不会落到图纸上 */}
+      {narrow && (mergeOpen || sizeOpen || outlineOpen || adjustOpen) && (
+        <div className="sheet-backdrop" aria-hidden onPointerDown={e => { e.preventDefault(); setMergeOpen(false); setSizeOpen(false); setOutlineOpen(false); setAdjustOpen(false); }} />
       )}
     </section>
   );

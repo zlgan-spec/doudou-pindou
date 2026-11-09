@@ -20,9 +20,20 @@ npm test           # 单元测试
 npm run build      # 类型检查 + 打包
 ```
 
-- 代码结构：`src/core/` 是出图核心（纯计算，不依赖页面），`src/render/` 画图纸，`src/ui/` 是页面，`src/workers/` 是后台线程
+- 代码结构：`src/core/` 是出图核心（纯计算，不依赖页面），`src/render/` 画图纸，`src/ui/` 是页面，`src/workers/` 是后台线程，`src/platform/` 是渠道适配层（`web/` 网站、`xhs/` 小红书小工具，同一个接口 `types.ts`）。页面里凡是「这个渠道怎么做」的事（存储、保存图纸、抠图、外链、文案）只问 `platform`，不自己判断环境
 - 提交说明用 `feat:` / `fix:` / `docs:` / `chore:` 加一句话，例如 `fix: 修复缩放卡顿`
 - 改了出图逻辑，请确认 52 / 78 / 104 的出图结果没有意外变化，并跑一遍 `npm test`
+
+### 小红书小工具版
+
+同一份代码的另一个构建（`vite build --mode xhs`，产物在 `dist-xhs/`）：没有抠图模型和后台线程、图纸库打进包里（只带作者 DouDou、出处 AI 原创的图纸）、保存图纸走平台的存相册接口、兼容 Chrome 61。
+
+```bash
+npm run build:xhs   # 类型检查 + 构建
+npm run pack:xhs    # 构建 + 文件类型检查 + 不含网站版代码检查 + 安全扫描 + 打成 release/doudou-minitool-<版本>.zip
+```
+
+打包脚本自带的扫描规则是通用的（密钥字样、本机路径、邮箱、source map）；维护者可以用 `DOUDOU_SCAN_RULES=/path/to/rules.json` 再加一份放在仓库外的规则（格式见脚本开头）。任何一条命中都不出 zip。
 
 ### 本地预览的两个开关（只在开发服务器里生效）
 

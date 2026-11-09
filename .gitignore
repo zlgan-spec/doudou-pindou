@@ -12,3 +12,7 @@ test-images
 .env.*
 !.env.example
 *.local
+
+# 小红书小工具版的构建产物和 zip
+dist-xhs/
+release/

@@ -1,4 +1,4 @@
-// 图纸库：整理好的现成图纸，放在 public/patterns/index.json，打开页面时读一次。
+// 图纸库：整理好的现成图纸，源文件是 public/patterns/index.json（网站版打开页面时读一次；小工具版打包时筛一份带进包里）。
 // 每张图纸直接存格子（一行一个字符串，像字符画），缩略图和大图都在浏览器里现画，不用另存图片。
 // 标签只能从 tags.json 的固定词表里选，避免「猫」「猫咪」「小猫」各一个；尺寸标签按豆板自动给。
 // 尺寸规则：读进来时把图案居中放到能装下它的最小豆板（52 / 78 / 104）上，超过 104×104 的不收。
@@ -7,6 +7,7 @@ import { SIZES, boardFor, type SizeId } from '../core/config';
 import { contentBounds, placeOnBoard, type Grid } from '../core/grid';
 import { isValidCode } from '../core/palette';
 import TAG_GROUPS from './tags.json';
+import { platform } from '@platform';
 
 // 标签分三层：大类（每张必有一个，写在第一个，决定它在「全部」里排在哪一段，词表顺序就是显示顺序）、细分、用途
 export const CATEGORY_TAGS: readonly string[] = TAG_GROUPS['大类'];
@@ -152,8 +153,7 @@ let cache: Promise<Library> | null = null;
 
 /** 读图纸库；读不到返回空的 */
 export function loadLibrary(): Promise<Library> {
-  cache ??= fetch(`${import.meta.env.BASE_URL}patterns/index.json`)
-    .then(r => (r.ok ? r.json() : null))
+  cache ??= platform.loadLibraryData()
     .then(parseLibrary)
     .catch(() => ({ patterns: [], series: [] }));
   return cache;
