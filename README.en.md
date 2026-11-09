@@ -53,9 +53,6 @@ npm test
 - [x] Two-way color count adjustment
 - [x] Pattern library: original patterns, added over time
 - [x] Line cleanup
-- [ ] Full background fill (for coasters)
-- [ ] One-click palette swap
-- [ ] Mirror symmetry fix
 
 ## Contributing
 
