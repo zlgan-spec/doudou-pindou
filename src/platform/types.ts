@@ -121,6 +121,4 @@ export interface Platform {
   onNote(fn: (note: Note) => void): () => void;
   /** 要挂在 App 里的渠道组件（小工具版：存相册预览弹窗）；没有就不挂 */
   Host: ComponentType | null;
-  /** 首页「分享」入口：有就出现 */
-  share: { available(): boolean; run(): void } | null;
 }

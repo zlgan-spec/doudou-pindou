@@ -140,5 +140,4 @@ export const platform: Platform = {
   },
   onNote: () => () => {},
   Host: null,
-  share: null,
 };

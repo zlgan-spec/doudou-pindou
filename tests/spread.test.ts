@@ -13,7 +13,6 @@ const follow = {
 const full = {
   writeTempFile: vi.fn((o: { data: string }) => Promise.resolve({ filePath: `/tmp/${o.data.length}.png` })),
   postNote: vi.fn((_o: unknown) => Promise.resolve({})),
-  share: vi.fn(() => Promise.resolve({})),
   ...follow,
 };
 
@@ -37,25 +36,22 @@ describe('预填的笔记文案', () => {
 });
 
 describe('入口开不开', () => {
-  it('不在小红书里：三个都没有', async () => {
+  it('不在小红书里：都没有', async () => {
     (globalThis as unknown as { window: unknown }).window = {};
     const m = await load();
     await m.initSpread();
-    expect(m.shareAvailable()).toBe(false);
     expect(m.afterSaveActions(['data:x'], () => {})).toEqual([]);
   });
-  it('接口齐、版本够：发笔记 + 关注作者；分享打开', async () => {
+  it('接口齐、版本够：发笔记 + 关注作者', async () => {
     install(full);
     const m = await load();
     await m.initSpread();
-    expect(m.shareAvailable()).toBe(true);
     expect(m.afterSaveActions(['data:x'], () => {}).map(a => a.label)).toEqual(['发笔记', '关注作者']);
   });
-  it('9.52：分享不出现、关注照常；9.50：关注也不出现', async () => {
+  it('9.52：关注照常；9.50：关注不出现', async () => {
     install(full, 9520003);
     let m = await load();
     await m.initSpread();
-    expect(m.shareAvailable()).toBe(false);
     expect(m.afterSaveActions(['data:x'], () => {}).map(a => a.label)).toEqual(['发笔记', '关注作者']);
     kv.removeItem('doudou-follow-asked-v1');
     install(full, 9500001);
@@ -150,20 +146,5 @@ describe('发笔记', () => {
     m2.afterSaveActions(['data:x'], t => said2.push(t))[0].run();
     await new Promise(r => setTimeout(r, 0));
     expect(said2).toEqual([]);
-  });
-});
-
-describe('分享', () => {
-  it('发小工具卡片；失败静默', async () => {
-    install(full);
-    const m = await load();
-    await m.initSpread();
-    m.shareCard();
-    expect(full.share).toHaveBeenCalledWith({ type: 'card' });
-    install({ ...full, share: () => Promise.reject({ errCode: 15503 }) });
-    const m2 = await load();
-    await m2.initSpread();
-    expect(() => m2.shareCard()).not.toThrow();
-    await new Promise(r => setTimeout(r, 0));
   });
 });

@@ -13,7 +13,7 @@ import { copy } from './copy';
 import { ExportHost, openExport } from './ExportSheet';
 import { initStorage, kv } from './kv';
 import { initSafeArea } from './safeArea';
-import { initSpread, shareAvailable, shareCard } from './spread';
+import { initSpread } from './spread';
 
 // 小工具不允许内联脚本：主题（深色 / 浅色）在渲染前设好，之后 App 跟着系统变
 function applyTheme(): void {
@@ -60,5 +60,4 @@ export const platform: Platform = {
   },
   onNote: onAlbumNote,
   Host: ExportHost,
-  share: { available: shareAvailable, run: shareCard },
 };

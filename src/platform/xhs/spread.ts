@@ -1,7 +1,6 @@
-// 帮账号拉人的三个平台接口（小工具版 1.1.0）：发笔记 postNote（§3.3）、关注作者 followAuthor / getFollowStatus（§3.15，客户端 9.51+）、
-// 分享小工具卡片 share（§3.18，客户端 9.53+）。
-// 三个都先探测方法存在、版本够不够，不够就当没有：入口不出现、不报错。启动时 initSpread() 查一次（在 initStorage 之后，要读 kv），
-// 之后页面同步问「能不能」，和 album.ts 的 albumAvailable 一个用法。
+// 帮账号拉人的两个平台接口（小工具版）：发笔记 postNote（§3.3）、关注作者 followAuthor / getFollowStatus（§3.15，客户端 9.51+）。
+// 分享不做：容器右上角自带分享按钮（getWindowInfo.menuButtons.share），2026-11-09 Ruby 真机确认后删掉。
+// 两个都先探测方法存在、版本够不够，不够就当没有：入口不出现、不报错。启动时 initSpread() 查一次（在 initStorage 之后，要读 kv）。
 import { buildVersion, kv } from './kv';
 import type { NoteAction } from '../types';
 
@@ -10,7 +9,6 @@ interface MiniTool {
   postNote?: (o: { title?: string; content?: string; pageType?: string; mediaInfo: { image_resources: Array<{ url: string }> } }) => Promise<unknown>;
   getFollowStatus?: () => Promise<{ follow_status: number }>;
   followAuthor?: () => Promise<{ follow_status: number }>;
-  share?: (o: { type: 'card' }) => Promise<unknown>;
 }
 
 /** 预填的笔记标题（平台上限 20 字）和正文（上限 1000 字）。不写「原创」（用户的原图可能是别人的）、不放网址 */
@@ -18,11 +16,9 @@ export const NOTE_TITLE = '我用 DouDou 做的拼豆图纸';
 export const NOTE_CONTENT = '图片一键转图纸，色号都标好了，照着拼就行。\n#拼豆图纸 #小红书小工具';
 const FOLLOW_ASKED_KEY = 'doudou-follow-asked-v1'; // 这台设备提过「关注作者」就记下来，只提一次
 const MIN_FOLLOW = 9510;
-const MIN_SHARE = 9530;
 const MAX_IMAGES = 18;
 
 let noteOn = false;
-let shareOn = false;
 let followOffer = false; // 还没提过、查到是「未关注」：下次存图成功时提一句
 
 function miniTool(): MiniTool | null {
@@ -37,12 +33,11 @@ function reason(e: unknown): string {
 
 /** 启动时调一次（initStorage 之后）：按方法和客户端版本定三个入口开不开；关注状态在后台查，不耽误页面出来 */
 export async function initSpread(): Promise<void> {
-  noteOn = shareOn = followOffer = false;
+  noteOn = followOffer = false;
   const mt = miniTool();
   if (!mt) return;
   const client = Math.floor((await buildVersion()) / 1000);
   noteOn = typeof mt.postNote === 'function' && typeof mt.writeTempFile === 'function';
-  shareOn = client >= MIN_SHARE && typeof mt.share === 'function';
   const status = client >= MIN_FOLLOW && typeof mt.followAuthor === 'function' && typeof mt.getFollowStatus === 'function' ? mt.getFollowStatus.bind(mt) : null;
   if (!status || kv.getItem(FOLLOW_ASKED_KEY)) return;
   try {
@@ -80,16 +75,4 @@ function follow(): void {
   if (!mt || typeof mt.followAuthor !== 'function') return;
   // 平台自己的确认流程就是反馈：成功、用户关掉确认框、今天已弹满 10 次，这边都不再多说一句
   mt.followAuthor().catch(() => {});
-}
-
-/** 首页「分享」入口出不出现 */
-export function shareAvailable(): boolean {
-  return shareOn;
-}
-
-/** 分享小工具卡片（站内私信）。只能在全屏容器里用、每人每天 10 次：失败一律静默 */
-export function shareCard(): void {
-  const mt = miniTool();
-  if (!mt || typeof mt.share !== 'function') return;
-  mt.share({ type: 'card' }).catch(() => { /* 半屏、超次数、用户取消 */ });
 }

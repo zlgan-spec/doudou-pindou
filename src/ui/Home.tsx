@@ -6,7 +6,6 @@ import { HeroCrosshair } from './HeroCrosshair';
 import { DouWord } from './DouWord';
 import { isHeic } from './loadImage';
 import { Logo } from './Logo';
-import { platform } from '@platform';
 
 interface Props {
   onFile: (file: File) => void;
@@ -45,7 +44,6 @@ export function Home({ onFile }: Props) {
             <a className="btn primary pill caps" href="#/make">开始做图纸</a>
             <a className="btn link caps" href="#/patterns">看看图纸库<i className="play" aria-hidden /></a>
             {/* 小工具版：把小工具卡片发给站内好友（客户端 9.53+ 才有，没有就不出现） */}
-            {platform.share?.available() && <button className="btn link caps" onClick={platform.share.run}>分享</button>}
           </div>
         )}
       </div>
