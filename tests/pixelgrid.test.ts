@@ -120,4 +120,24 @@ describe('像素画网格识别', () => {
     }
     expect(detectPixelGrid({ width, height, data })).toBeNull();
   });
+
+  it('比一格细、不在格子正中的深色线不会读断；旁边色块蹭进来的不算线', () => {
+    const pitch = 12, cols = 20, rows = 20;
+    const width = cols * pitch, height = rows * pitch;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const row = Math.floor(y / pitch);
+        // 第 7 列左边 4 像素宽的竖线（第 2 到 17 行）；第 12、13 列是深色块，往第 14 列多蹭进 4 像素
+        const line = x >= 7 * pitch && x < 7 * pitch + 4 && row >= 2 && row <= 17;
+        const block = x >= 12 * pitch && x < 14 * pitch + 4 && row >= 5 && row <= 10;
+        data.set(line || block ? [53, 38, 39, 255] : [253, 220, 198, 255], (y * width + x) * 4);
+      }
+    }
+    const small = resampleOnGrid({ width, height, data }, { pitch, offsetX: 0, offsetY: 0, cols, rows, method: 'lattice' });
+    const dark = (c: number, r: number) => small.data[(r * cols + c) * 4] < 100;
+    for (let r = 2; r <= 17; r++) expect(dark(7, r), `第 ${r} 行的线`).toBe(true);
+    expect(dark(6, 8)).toBe(false);
+    for (let r = 5; r <= 10; r++) expect(dark(14, r), `第 ${r} 行色块右边`).toBe(false);
+  });
 });

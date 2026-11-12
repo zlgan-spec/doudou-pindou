@@ -479,5 +479,87 @@ export function resampleOnGrid(img: RgbaImage, grid: PixelGrid): RgbaImage {
       out[o + 3] = alphaSum / n >= 128 ? 255 : 0;
     }
   }
+  keepThinLines(img, xs, ys, cols, rows, out);
   return { width: cols, height: rows, data: out };
+}
+
+/**
+ * 细线不断：AI 画的像素图里，眼镜框、口袋线、发丝这类深色线常常比一格细、也不在格子正中，
+ * 按格子中间的多数色取，线经过格子边上时这一格就读成了底色，线就断了。
+ * 这里补一遍：一格里深色（描边那么深）、又明显比它读出的颜色深的像素占到三成以上，就按这些深色像素取色。
+ * 只认深色的线：浅底上的红线、棕线这类中间调的细线不补（邮票内框那种两像素的细线会被补成半截、颜色也发灰）。
+ * 两种情况不补，免得把线撑粗、把色块撑大：
+ * - 深色像素偏在格子一侧，而那一侧的邻格本来就是深色（是旁边色块没对齐格线蹭进来的，不是线）；
+ * - 一条线正好骑在两格中间，两格都够三成：只留深色多的那一格。
+ * 格子太小（不到 8 像素）时不做：没有足够的像素判断。真正的像素画每格只有一种颜色，不受影响。
+ */
+const LINE_MIN_CELL = 8;
+const LINE_MIN_SHARE = 0.3;
+const LINE_MAX_L = 0.45;      // 线本身要这么深（Oklab 亮度）
+const LINE_DARKER = 0.2;      // 还要比这一格读出的颜色暗这么多
+const LINE_OFF_CENTER = 0.15; // 深色像素的重心偏离格子中心这么多（格宽的比例）算偏在一侧
+function keepThinLines(img: RgbaImage, xs: number[], ys: number[], cols: number, rows: number, out: Uint8ClampedArray): void {
+  // 每个像素都要算亮度，一张 1024 的图有一百万个：按 5 位 / 通道查表，同一档颜色只算一次
+  const lut = new Float32Array(32768).fill(-1);
+  const light = (i: number) => {
+    const r = img.data[i] >> 3, g = img.data[i + 1] >> 3, b = img.data[i + 2] >> 3;
+    const key = (r << 10) | (g << 5) | b;
+    if (lut[key] < 0) lut[key] = rgbToLab((r << 3) | 4, (g << 3) | 4, (b << 3) | 4)[0];
+    return lut[key];
+  };
+  const cellL = new Float32Array(cols * rows);
+  for (let k = 0; k < cols * rows; k++) cellL[k] = out[k * 4 + 3] ? rgbToLab(out[k * 4], out[k * 4 + 1], out[k * 4 + 2])[0] : -1;
+  interface Line { share: number; rgb: [number, number, number]; dx: number; dy: number }
+  const found = new Map<number, Line>();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const k = r * cols + c;
+      const x0 = Math.round(xs[c]), x1 = Math.min(img.width, Math.round(xs[c + 1]));
+      const y0 = Math.round(ys[r]), y1 = Math.min(img.height, Math.round(ys[r + 1]));
+      if (cellL[k] < 0 || x1 - x0 < LINE_MIN_CELL || y1 - y0 < LINE_MIN_CELL) continue;
+      let n = 0, dark = 0, rs = 0, gs = 0, bs = 0, sx = 0, sy = 0;
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          const i = (y * img.width + x) * 4;
+          if (img.data[i + 3] < 128) continue;
+          n++;
+          const l = light(i);
+          if (l > LINE_MAX_L || cellL[k] - l < LINE_DARKER) continue;
+          dark++;
+          rs += img.data[i];
+          gs += img.data[i + 1];
+          bs += img.data[i + 2];
+          sx += x + 0.5;
+          sy += y + 0.5;
+        }
+      }
+      if (!n || dark < n * LINE_MIN_SHARE) continue;
+      found.set(k, {
+        share: dark / n,
+        rgb: [Math.round(rs / dark), Math.round(gs / dark), Math.round(bs / dark)],
+        dx: (sx / dark - (x0 + x1) / 2) / (x1 - x0),
+        dy: (sy / dark - (y0 + y1) / 2) / (y1 - y0),
+      });
+    }
+  }
+  for (const [k, line] of found) {
+    const c = k % cols, r = (k - c) / cols;
+    const lineL = rgbToLab(...line.rgb)[0];
+    // 深色像素偏向哪一侧，就看那一侧的邻格
+    const sides: Array<[number, number]> = [];
+    if (Math.abs(line.dx) > LINE_OFF_CENTER) sides.push([Math.sign(line.dx), 0]);
+    if (Math.abs(line.dy) > LINE_OFF_CENTER) sides.push([0, Math.sign(line.dy)]);
+    let keep = true;
+    for (const [dx, dy] of sides) {
+      const nc = c + dx, nr = r + dy;
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const j = nr * cols + nc;
+      const other = found.get(j);
+      if (other ? other.share > line.share || (other.share === line.share && j < k) : cellL[j] >= 0 && cellL[j] - lineL < LINE_DARKER / 2) keep = false;
+    }
+    if (!keep) continue;
+    out[k * 4] = line.rgb[0];
+    out[k * 4 + 1] = line.rgb[1];
+    out[k * 4 + 2] = line.rgb[2];
+  }
 }
