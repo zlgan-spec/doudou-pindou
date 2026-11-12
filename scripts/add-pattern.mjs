@@ -53,6 +53,10 @@ if (!/^[a-z0-9-]{1,40}$/.test(args.id ?? '')) fail('--id 只能用小写英文�
 const tags = (args.tags ?? '').split(/[,，]/).map(t => t.trim()).filter(Boolean);
 const unknown = tags.filter(t => !KNOWN.has(t));
 if (unknown.length) fail(`这些标签不在词表里：${unknown.join('、')}。可用的：${[...KNOWN].join('、')}。要加新标签先改 src/ui/tags.json。`);
+// 每张图纸有且只有一个大类，写在第一个（图纸库第一排按大类筛，重叠了数量就不准）
+const cats = tags.filter(t => TAGS['大类'].includes(t));
+if (cats.length !== 1) fail(`--tags 里要有且只有一个大类（${TAGS['大类'].join('、')}），现在是：${cats.join('、') || '没有'}。动漫、游戏里的角色写作品那一类，不再另写「人物」「动物」。`);
+tags.splice(0, tags.length, cats[0], ...tags.filter(t => t !== cats[0]));
 // 和网站读图纸库时的规则一致（src/ui/library.ts），不合格的条目网站会悄悄跳过，这里提前报错
 if (args.link && (!/^https:\/\/[^\s"<>]+$/.test(args.link) || args.link.length > 300)) fail('--link 要是 https 开头、不含空格和引号尖括号的网址（300 字以内）。');
 if ((args.name ?? '').length > 30) fail('--name 最多 30 个字。');

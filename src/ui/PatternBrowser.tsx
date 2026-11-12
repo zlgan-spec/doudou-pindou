@@ -5,7 +5,7 @@ import { ScrollBar } from './ScrollBar';
 import { SIZES, boardLabel, type SizeId, type StyleId } from '../core/config';
 import { beadCount, legendOf, type Grid } from '../core/grid';
 import { renderSheet, sheetLayout } from '../render/sheet';
-import { CATEGORY_TAGS, DETAIL_TAGS, sizeOf, USE_TAGS } from './library';
+import { buildFilters, primaryCategory, sizeOf, TAG_CHIP_MIN } from './library';
 import { platform } from '@platform';
 import { setToastHost } from './NoteToast';
 import { embedPatternDataUrl, sheetFileName } from './pngData';
@@ -81,38 +81,38 @@ function Card({ item, i, bare, onOpen }: { item: BrowserItem; i: number; bare: b
 }
 
 export function PatternBrowser({ items, actions, series = [], blocks: allBlocks }: Props) {
-  const chipsRef = useRef<HTMLDivElement>(null);
+  const catsRef = useRef<HTMLDivElement>(null);
+  const subsRef = useRef<HTMLDivElement>(null);
   const library = series.length > 0;
   const [query, setQuery] = useState('');
-  // 图纸库：选系列或豆板；我的收藏：选标签。旧的系列网址打开时直接选中那个系列
-  const [tag, setTag] = useState(() => series.find(s => s.id === seriesOfHash())?.name ?? ALL);
+  const seriesOf = useMemo(() => new Map(series.flatMap(s => s.items.map(i => [i.id, s.name] as const))), [series]);
+  // 筛选分两排：第一排大类，第二排是这个大类下的系列和标签；尺寸收成搜索框旁边的下拉。旧的系列网址打开时直接选中那个系列
+  const fromHash = useMemo(() => series.find(s => s.id === seriesOfHash()) ?? null, [series]);
+  const [cat, setCat] = useState<string | null>(() => (fromHash ? primaryCategory(fromHash.items[0]?.tags ?? []) : null));
+  const [sub, setSub] = useState<string | null>(() => fromHash?.name ?? null);
+  const [size, setSize] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = items.find(i => i.id === activeId) ?? null;
-  const seriesOf = useMemo(() => new Map(series.flatMap(s => s.items.map(i => [i.id, s.name] as const))), [series]);
 
-  // 一排按钮：全部 → 尺寸 → 大类 → 细分 → 用途，图纸库最后再接各系列（和「全部」里的先后一样）。只列有图纸的
-  const chips = useMemo(() => {
-    const sizes = Object.values(SIZES).map(s => s.label);
-    const count = (t: string) => items.filter(i => seriesOf.get(i.id) === t || i.tags.includes(t) || sizeLabel(i.grid) === t).length;
-    // 系列名和标签同名（如「风景」「货币」）只留一个按钮：选它时标签和系列里的图纸都会列出来
-    const names = [...new Set([...sizes, ...CATEGORY_TAGS, ...DETAIL_TAGS, ...USE_TAGS, ...(library ? series.map(s => s.name) : [])])];
-    return [{ name: ALL, n: items.length }, ...names.map(name => ({ name, n: count(name) })).filter(c => c.n > 0)];
-  }, [items, series, seriesOf, library]);
+  const filters = useMemo(() => buildFilters(
+    items.map(i => ({ id: i.id, tags: i.tags, size: sizeLabel(i.grid), series: seriesOf.get(i.id) ?? null })),
+    series.map(s => s.name), cat, library ? TAG_CHIP_MIN : 1,
+  ), [items, series, seriesOf, cat, library]);
+  const pickCat = (c: string | null) => { setCat(c); setSub(null); };
 
+  // 图纸库照排好的顺序（同一系列挨在一起），筛出来的结果也保持这个先后；我的收藏照自己的顺序
+  const ordered = useMemo(() => (library && allBlocks ? allBlocks.flat() : items), [library, allBlocks, items]);
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter(i => {
-      const labels = [...i.tags, sizeLabel(i.grid) ?? '', seriesOf.get(i.id) ?? ''];
-      if (tag !== ALL && !labels.includes(tag)) return false;
-      return !q || i.name.toLowerCase().includes(q) || labels.some(t => t && t.includes(q));
+    return ordered.filter(i => {
+      const s = seriesOf.get(i.id) ?? '';
+      if (cat && primaryCategory(i.tags) !== cat) return false;
+      if (sub && s !== sub && !i.tags.includes(sub)) return false;
+      if (size && sizeLabel(i.grid) !== size) return false;
+      return !q || i.name.toLowerCase().includes(q) || [...i.tags, sizeLabel(i.grid) ?? '', s].some(t => t && t.toLowerCase().includes(q));
     });
-  }, [items, query, tag, seriesOf]);
-
-  // 图纸库「全部」：照排好的顺序连着铺（同一系列挨在一起），不按系列换行，免得行尾留空；选了标签或搜索时就是筛出来的结果
-  const blocks = useMemo(() => {
-    if (!library || tag !== ALL || query.trim() || !allBlocks) return [list];
-    return [allBlocks.flat()];
-  }, [library, tag, query, list, allBlocks]);
+  }, [ordered, query, cat, sub, size, seriesOf]);
+  const blocks = useMemo(() => [list], [list]);
 
   // 大图里翻页的顺序 = 页面上从左到右、从上到下的顺序；首尾相接
   const order = useMemo(() => blocks.flat(), [blocks]);
@@ -125,16 +125,37 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
   return (
     <>
       <div className="color-tools">
-        <label className="search">
-          <svg viewBox="0 0 24 24" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder={library ? '搜名字或系列，如 猫咪、货币' : '搜名字或标签，如 猫咪、杯垫'} maxLength={20} aria-label="搜索图纸" />
-        </label>
-        {chips.length > 2 && (
+        <div className="search-row">
+          <label className="search">
+            <svg viewBox="0 0 24 24" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder={library ? '搜名字或系列，如 猫咪、货币' : '搜名字或标签，如 猫咪、杯垫'} maxLength={20} aria-label="搜索图纸" />
+          </label>
+          {filters.sizes.length > 1 && (
+            <select className="size-pick" value={size} onChange={e => setSize(e.target.value)} aria-label="豆板尺寸">
+              <option value="">全部尺寸</option>
+              {filters.sizes.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+            </select>
+          )}
+        </div>
+        {filters.cats.length > 1 && (
           <>
-            <ScrollBar target={chipsRef} axis="x" deps={[chips.length]} />
-            <div className="chips" ref={chipsRef} role="tablist" aria-label={library ? '系列' : '标签'}>
-              {chips.map(c => (
-                <button key={c.name} role="tab" aria-selected={tag === c.name} className={tag === c.name ? 'on' : ''} onClick={() => setTag(c.name)}>
+            <ScrollBar target={catsRef} axis="x" deps={[filters.cats.length]} />
+            <div className="chips" ref={catsRef} role="tablist" aria-label="大类">
+              <button role="tab" aria-selected={!cat} className={!cat ? 'on' : ''} onClick={() => pickCat(null)}>{ALL}<small>{items.length}</small></button>
+              {filters.cats.map(c => (
+                <button key={c.name} role="tab" aria-selected={cat === c.name} className={cat === c.name ? 'on' : ''} onClick={() => pickCat(c.name)}>
+                  {c.name}<small>{c.n}</small>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {filters.subs.length > 0 && (
+          <>
+            <ScrollBar target={subsRef} axis="x" deps={[filters.subs.length, cat]} />
+            <div className="chips sub" ref={subsRef} role="tablist" aria-label={library ? '系列和标签' : '标签'}>
+              {filters.subs.map(c => (
+                <button key={c.name} role="tab" aria-selected={sub === c.name} className={sub === c.name ? 'on' : ''} onClick={() => setSub(sub === c.name ? null : c.name)}>
                   {c.name}<small>{c.n}</small>
                 </button>
               ))}
@@ -144,7 +165,7 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
       </div>
 
       {!list.length ? (
-        <p className="color-hint">没有找到{query.trim() ? `「${query.trim()}」` : '这一类的图纸'}，换个名字试试</p>
+        <p className="color-hint">没有找到{query.trim() ? `「${query.trim()}」` : '这一类的图纸'}，换个{query.trim() ? '名字' : '筛选'}试试</p>
       ) : (
         // 图纸库的卡片比色卡大一些、只放图（用户主要看图）；我的收藏和色卡库同一套卡片
         <div className="pattern-blocks">

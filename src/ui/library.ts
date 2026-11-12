@@ -9,7 +9,7 @@ import { isValidCode } from '../core/palette';
 import TAG_GROUPS from './tags.json';
 import { platform } from '@platform';
 
-// 标签分三层：大类（每张必有一个，写在第一个，决定它在「全部」里排在哪一段，词表顺序就是显示顺序）、细分、用途
+// 标签分三层：大类（每张有且只有一个，写在第一个，决定它在「全部」里排在哪一段，词表顺序就是显示顺序）、细分、用途
 export const CATEGORY_TAGS: readonly string[] = TAG_GROUPS['大类'];
 export const DETAIL_TAGS: readonly string[] = TAG_GROUPS['细分'];
 export const USE_TAGS: readonly string[] = TAG_GROUPS['用途'];
@@ -19,6 +19,32 @@ const KNOWN_TAGS = new Set([...CATEGORY_TAGS, ...DETAIL_TAGS, ...USE_TAGS]);
 export function categoryRank(tags: readonly string[]): number {
   const c = tags.find(t => CATEGORY_TAGS.includes(t));
   return c ? CATEGORY_TAGS.indexOf(c) : CATEGORY_TAGS.length;
+}
+
+/** 图纸的大类：标签里第一个大类词（每张只有一个，见 scripts/normalize-tags.mjs），没有就是 null */
+export function primaryCategory(tags: readonly string[]): string | null {
+  return tags.find(t => CATEGORY_TAGS.includes(t)) ?? null;
+}
+
+/** 图纸库的标签至少几张才单独出一个按钮；不够的搜索照样搜得到 */
+export const TAG_CHIP_MIN = 5;
+
+export interface FilterChip { name: string; n: number }
+export interface FilterItem { id: string; tags: readonly string[]; size: string | null; series: string | null }
+
+/**
+ * 筛选分两排：第一排大类（单选），第二排跟着大类变：这个大类下的系列在前，再接够数的细分 / 用途标签。
+ * 选「全部」（cat 为 null）时第二排只有标签，不列系列（系列太多，先选大类再看）。和系列、大类同名的标签不重复出。
+ */
+export function buildFilters(items: readonly FilterItem[], seriesNames: readonly string[], cat: string | null, minTag: number): { cats: FilterChip[]; subs: FilterChip[]; sizes: FilterChip[] } {
+  const count = (list: readonly FilterItem[], f: (i: FilterItem) => boolean) => list.filter(f).length;
+  const cats = [...CATEGORY_TAGS].map(name => ({ name, n: count(items, i => primaryCategory(i.tags) === name) })).filter(c => c.n > 0);
+  const scope = cat ? items.filter(i => primaryCategory(i.tags) === cat) : items;
+  const series = cat ? seriesNames.map(name => ({ name, n: count(scope, i => i.series === name) })).filter(c => c.n > 0) : [];
+  const taken = new Set([...series.map(c => c.name), ...CATEGORY_TAGS]);
+  const tags = [...DETAIL_TAGS, ...USE_TAGS].filter(t => !taken.has(t)).map(name => ({ name, n: count(scope, i => i.tags.includes(name)) })).filter(c => c.n >= minTag && c.n < scope.length);
+  const sizes = Object.values(SIZES).map(s => ({ name: s.label, n: count(items, i => i.size === s.label) })).filter(c => c.n > 0);
+  return { cats, subs: [...series, ...tags], sizes };
 }
 
 export interface LibraryPattern {

@@ -33,3 +33,34 @@ describe('系列', () => {
     expect(groupSeries(lib).singles.map(p => p.id)).toEqual(['a']);
   });
 });
+
+describe('筛选：第一排大类，第二排跟着大类变', () => {
+  const item = (id: string, tags: string[], series: string | null = null, size = '52×52') => ({ id, tags, size, series });
+  const items = [
+    item('conan', ['动漫'], '名侦探柯南'), item('ran', ['动漫'], '名侦探柯南'),
+    item('cat-1', ['动物', '猫咪'], '金渐层'), item('cat-2', ['动物', '猫咪'], '金渐层', '78×78'), item('dog', ['动物']),
+    item('lake', ['风景', '挂画']),
+  ];
+  const series = ['名侦探柯南', '金渐层'];
+
+  it('大类只数每张图纸的第一个大类，没有图纸的大类不出按钮', async () => {
+    const { buildFilters, primaryCategory } = await import('../src/ui/library');
+    expect(primaryCategory(['动漫', '猫咪'])).toBe('动漫');
+    expect(primaryCategory(['猫咪'])).toBeNull();
+    expect(buildFilters(items, series, null, 1).cats).toEqual([{ name: '动漫', n: 2 }, { name: '动物', n: 3 }, { name: '风景', n: 1 }]);
+  });
+
+  it('选了大类：第二排先列这个大类下的系列，再接够数的标签；整类都有的标签不出', async () => {
+    const { buildFilters } = await import('../src/ui/library');
+    expect(buildFilters(items, series, '动物', 1).subs).toEqual([{ name: '金渐层', n: 2 }, { name: '猫咪', n: 2 }]);
+    expect(buildFilters(items, series, '动物', 3).subs).toEqual([{ name: '金渐层', n: 2 }]);
+    expect(buildFilters(items, series, '风景', 1).subs).toEqual([]);
+  });
+
+  it('选「全部」：第二排只有标签，不列系列；尺寸只列有图纸的', async () => {
+    const { buildFilters } = await import('../src/ui/library');
+    const f = buildFilters(items, series, null, 1);
+    expect(f.subs).toEqual([{ name: '猫咪', n: 2 }, { name: '挂画', n: 1 }]);
+    expect(f.sizes).toEqual([{ name: '52×52', n: 5 }, { name: '78×78', n: 1 }]);
+  });
+});

@@ -227,8 +227,7 @@
       "id": "tomato-bunny",
       "name": "番茄与兔子",
       "tags": [
-        "动物",
-        "食物"
+        "动物"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -1396,7 +1395,8 @@
       "id": "cloud-meadow",
       "name": "风景",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -1525,8 +1525,7 @@
       "id": "conan-conan",
       "name": "名侦探柯南 · 柯南",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -1646,8 +1645,7 @@
       "id": "conan-kid",
       "name": "名侦探柯南 · 怪盗基德",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -1767,8 +1765,7 @@
       "id": "conan-ran",
       "name": "名侦探柯南 · 毛利兰",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -1888,8 +1885,7 @@
       "id": "conan-shinichi",
       "name": "名侦探柯南 · 工藤新一",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2009,8 +2005,7 @@
       "id": "conan-haibara",
       "name": "名侦探柯南 · 灰原哀",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2130,8 +2125,7 @@
       "id": "conan-heiji",
       "name": "名侦探柯南 · 服部平次",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2251,8 +2245,7 @@
       "id": "conan-sonoko",
       "name": "名侦探柯南 · 铃木园子",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2372,8 +2365,7 @@
       "id": "conan-akai",
       "name": "名侦探柯南 · 赤井秀一",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2489,8 +2481,7 @@
       "id": "conan-amuro",
       "name": "名侦探柯南 · 安室透",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2610,8 +2601,7 @@
       "id": "ccs-sakura",
       "name": "百变小樱 · 小樱",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2695,8 +2685,7 @@
       "id": "ccs-syaoran",
       "name": "百变小樱 · 小狼",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2780,8 +2769,7 @@
       "id": "ccs-tomoyo",
       "name": "百变小樱 · 知世",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2865,8 +2853,7 @@
       "id": "ccs-syaoran-uniform",
       "name": "百变小樱 · 小狼（校服）",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -2950,8 +2937,7 @@
       "id": "ccs-sakura-angel",
       "name": "百变小樱 · 小樱（天使）",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3035,8 +3021,7 @@
       "id": "ccs-kero",
       "name": "百变小樱 · 小可",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3120,8 +3105,7 @@
       "id": "ccs-yue",
       "name": "百变小樱 · 月",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3205,8 +3189,7 @@
       "id": "ccs-sakura-cat",
       "name": "百变小樱 · 小樱（猫耳）",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3290,8 +3273,7 @@
       "id": "ccs-meiling",
       "name": "百变小樱 · 苺铃",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3375,8 +3357,7 @@
       "id": "sailor-q-moon",
       "name": "美少女战士 · Q 版水冰月",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3448,8 +3429,7 @@
       "id": "sailor-q-mercury",
       "name": "美少女战士 · Q 版水星",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3519,8 +3499,7 @@
       "id": "sailor-q-mars",
       "name": "美少女战士 · Q 版火星",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3589,8 +3568,7 @@
       "id": "sailor-q-jupiter",
       "name": "美少女战士 · Q 版木星",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3661,8 +3639,7 @@
       "id": "sailor-q-venus",
       "name": "美少女战士 · Q 版金星",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3734,8 +3711,7 @@
       "id": "sailor-q-chibi-moon",
       "name": "美少女战士 · Q 版小小兔",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3805,8 +3781,7 @@
       "id": "sailor-q-uranus",
       "name": "美少女战士 · Q 版天王星",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3876,8 +3851,7 @@
       "id": "sailor-q-neptune",
       "name": "美少女战士 · Q 版海王星",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -3948,8 +3922,7 @@
       "id": "sailor-q-pluto",
       "name": "美少女战士 · Q 版冥王星",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4020,8 +3993,7 @@
       "id": "inuyasha-inuyasha",
       "name": "犬夜叉 · 犬夜叉",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4141,8 +4113,7 @@
       "id": "inuyasha-kagome",
       "name": "犬夜叉 · 日暮戈薇",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4262,8 +4233,7 @@
       "id": "inuyasha-sesshomaru",
       "name": "犬夜叉 · 杀生丸",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4383,8 +4353,7 @@
       "id": "inuyasha-miroku",
       "name": "犬夜叉 · 弥勒",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4504,8 +4473,7 @@
       "id": "inuyasha-sango",
       "name": "犬夜叉 · 珊瑚",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4625,8 +4593,7 @@
       "id": "inuyasha-shippo",
       "name": "犬夜叉 · 七宝",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4746,8 +4713,7 @@
       "id": "inuyasha-kirara",
       "name": "犬夜叉 · 云母",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4866,8 +4832,7 @@
       "id": "inuyasha-naraku",
       "name": "犬夜叉 · 奈落",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -4987,8 +4952,7 @@
       "id": "inuyasha-kikyo",
       "name": "犬夜叉 · 桔梗",
       "tags": [
-        "动漫",
-        "人物"
+        "动漫"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -5732,8 +5696,7 @@
       "id": "hok-1",
       "name": "王者荣耀 · 1 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -5853,8 +5816,7 @@
       "id": "hok-2",
       "name": "王者荣耀 · 2 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -5974,8 +5936,7 @@
       "id": "hok-3",
       "name": "王者荣耀 · 3 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -6095,8 +6056,7 @@
       "id": "hok-4",
       "name": "王者荣耀 · 4 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -6216,8 +6176,7 @@
       "id": "hok-5",
       "name": "王者荣耀 · 5 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -6337,8 +6296,7 @@
       "id": "hok-6",
       "name": "王者荣耀 · 6 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -6458,8 +6416,7 @@
       "id": "hok-7",
       "name": "王者荣耀 · 7 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -6579,8 +6536,7 @@
       "id": "hok-8",
       "name": "王者荣耀 · 8 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -6700,8 +6656,7 @@
       "id": "hok-9",
       "name": "王者荣耀 · 9 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -6821,8 +6776,7 @@
       "id": "idv-gardener",
       "name": "第五人格 · 园丁",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -6942,8 +6896,7 @@
       "id": "idv-seer",
       "name": "第五人格 · 先知",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -7063,8 +7016,7 @@
       "id": "idv-jack",
       "name": "第五人格 · 杰克",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -7184,8 +7136,7 @@
       "id": "idv-4",
       "name": "第五人格 · 4 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -7305,8 +7256,7 @@
       "id": "idv-5",
       "name": "第五人格 · 5 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -7426,8 +7376,7 @@
       "id": "idv-6",
       "name": "第五人格 · 6 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -7547,8 +7496,7 @@
       "id": "idv-7",
       "name": "第五人格 · 7 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -7668,8 +7616,7 @@
       "id": "idv-geisha",
       "name": "第五人格 · 红蝶",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -7789,8 +7736,7 @@
       "id": "idv-9",
       "name": "第五人格 · 9 号",
       "tags": [
-        "游戏",
-        "人物"
+        "游戏"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -8334,7 +8280,8 @@
       "id": "cherry-blossom-lake",
       "name": "樱花湖畔",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -8438,7 +8385,8 @@
       "id": "snow-mountain-lake",
       "name": "雪山湖光",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -8540,7 +8488,8 @@
       "id": "sunflower-field",
       "name": "向日葵花田",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -8644,7 +8593,8 @@
       "id": "lavender-sunset",
       "name": "薰衣草日落",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -8748,7 +8698,8 @@
       "id": "autumn-lake",
       "name": "秋日湖畔",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -8851,7 +8802,8 @@
       "id": "city-night",
       "name": "城市夜景",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -8954,7 +8906,8 @@
       "id": "palm-beach",
       "name": "椰林海滩",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -9057,7 +9010,8 @@
       "id": "canyon-sunset",
       "name": "峡谷日落",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -9160,7 +9114,8 @@
       "id": "snow-mountain-meadow",
       "name": "雪山草地",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -9265,7 +9220,8 @@
       "id": "clouds-over-sea",
       "name": "晴空海面",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -9370,7 +9326,8 @@
       "id": "snowy-cabin",
       "name": "雪夜小屋",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
@@ -9475,7 +9432,8 @@
       "id": "aurora-night",
       "name": "极光之夜",
       "tags": [
-        "风景"
+        "风景",
+        "挂画"
       ],
       "author": "DouDou",
       "source": "AI 原创",
