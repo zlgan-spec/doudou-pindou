@@ -2,14 +2,13 @@
 // 步骤：取样 → 偏色修正和风格 → 按色族减色 → 每格投票 → 清理（保护关键细节）→ 勾轮廓 → 放到豆板。
 import { regularizeEdges, tidyEdges } from './contour';
 import { classifyInput, hasOwnOutline, type InputKind } from './classify';
-import { capColors, mergeNearDuplicates, mergeRareColors, mergeSmallRegions, protectDetails, removeIslands, detailColors } from './cleanup';
+import { capColors, mergeFaintSpecks, mergeNearDuplicates, mergeRareColors, mergeSmallRegions, protectDetails, removeIslands, detailColors } from './cleanup';
 import { chroma, labDistance, rgbToLab, type Lab } from './color';
 import { MAX_COLORS, MIN_BEADS_PER_COLOR, SIZES, STYLES, boardArea, fitSide, type SizeId, type StyleId } from './config';
 import { connectedRegions, createGrid, legendOf, type Grid } from './grid';
 import type { Mask, RgbaImage } from './image';
 import { addOutline, type OpenSides } from './outline';
-import { colorOf, matchDistance } from './palette';
-import { nearest, PALETTE } from './palette';
+import { colorOf, matchDistance, nearest, PALETTE, type BeadColor } from './palette';
 import { generateFromPhoto } from './photo';
 
 export interface PatternOptions {
@@ -374,13 +373,21 @@ function placeOnBoard(codes: (string | null)[], w: number, h: number, board?: nu
 const PIXEL_ART_CLUSTER_RADIUS = 0.045; // 作者会故意用很接近的两种颜色（奶白身体 vs 淡黄背景差 0.05），聚类半径只能吃掉压缩噪点
 
 /**
- * 有颜色的就配有颜色的豆：MARD 在中等亮度的青灰、蓝灰一带只有灰豆离得近，纯最近色会把青灰狼（#679a9b）
- * 配成灰 H20，拼出来就不是青色了。颜色明显带色（色度 ≥ 0.04）而最近的豆几乎没色（色度不到它的 40%）时，
- * 在色相 ±30°、色度至少一半的豆里找最近的，只多付一点距离就换过去。
- * 色度低的灰毛不受影响（不会被挤成彩色豆）。
+ * 像素画找色号：先找最近的，再防两种「颜色跑了」。MARD 在中等亮度的灰蓝、青灰、灰紫一带豆很少，
+ * 纯最近色常常落到色相不对的豆上。
+ * 1. 带色的配成了灰：青灰狼（#679a9b）配成灰 H20、灰蓝的门（#424d62）配成深灰 H5。颜色明显带色（色度 ≥ 0.03）
+ *    而最近的豆几乎没色（色度不到它的 40%）时，在色相 ±30°、色度是它 0.5 到 1.6 倍的豆里找最近的
+ *    （太鲜艳的不要：灰蓝配成宝蓝一样不像），多付一点距离就换过去，宁可深一档也要留住颜色。
+ * 2. 色相跑偏还更鲜艳：灰紫的裤子（#605560）配成砖红棕 M12。最近的豆色相差 40° 以上、又比原色鲜艳时，
+ *    在色相没跑偏、或者几乎没色（色度不到原色一半）的豆里找最近的，只多付一点距离就换过去。
+ * 色度很低的灰不受影响（不会被挤成彩色豆）。
  */
-const KEEP_HUE_MIN_CHROMA = 0.04;
-const KEEP_HUE_MARGIN = 0.02;
+const KEEP_HUE_MIN_CHROMA = 0.03;
+const KEEP_HUE_MARGIN = 0.07;
+const KEEP_HUE_CHROMA: [number, number] = [0.5, 1.6];
+const DRIFT_MIN_CHROMA = 0.02;
+const DRIFT_HUE = 40;
+const DRIFT_MARGIN = 0.03;
 const hueOf = (l: Lab) => (Math.atan2(l[2], l[1]) * 180) / Math.PI;
 const hueGap = (a: number, b: number) => {
   const d = Math.abs(a - b) % 360;
@@ -388,20 +395,29 @@ const hueGap = (a: number, b: number) => {
 };
 function nearestKeepingHue(lab: Lab): string {
   const pick = nearest(lab);
-  const c = chroma(lab);
-  if (c < KEEP_HUE_MIN_CHROMA || chroma(pick.lab) >= c * 0.4) return pick.code;
-  const h = hueOf(lab);
-  const sameHue = PALETTE.filter(p => chroma(p.lab) >= c * 0.5 && hueGap(hueOf(p.lab), h) <= 30);
-  if (!sameHue.length) return pick.code;
-  const alt = nearest(lab, sameHue);
-  return matchDistance(lab, alt.lab) - matchDistance(lab, pick.lab) <= KEEP_HUE_MARGIN ? alt.code : pick.code;
+  const c = chroma(lab), h = hueOf(lab);
+  const within = (allowed: BeadColor[], margin: number) => {
+    if (!allowed.length) return pick.code;
+    const alt = nearest(lab, allowed);
+    return matchDistance(lab, alt.lab) - matchDistance(lab, pick.lab) <= margin ? alt.code : pick.code;
+  };
+  if (c >= KEEP_HUE_MIN_CHROMA && chroma(pick.lab) < c * 0.4) {
+    return within(PALETTE.filter(p => {
+      const pc = chroma(p.lab);
+      return pc >= c * KEEP_HUE_CHROMA[0] && pc <= c * KEEP_HUE_CHROMA[1] && hueGap(hueOf(p.lab), h) <= 30;
+    }), KEEP_HUE_MARGIN);
+  }
+  if (c >= DRIFT_MIN_CHROMA && chroma(pick.lab) > c && hueGap(hueOf(pick.lab), h) > DRIFT_HUE) {
+    return within(PALETTE.filter(p => chroma(p.lab) <= c * 0.5 || hueGap(hueOf(p.lab), h) <= DRIFT_HUE), DRIFT_MARGIN);
+  }
+  return pick.code;
 }
 
 /**
  * 按出现频率贪心聚类：最常见的颜色先成为一类中心，之后的颜色离某个中心够近就归入，否则新开一类。
- * 返回"颜色 → 该类对应的 MARD 色号"的函数。keepHue：带色的中心不配成灰豆（像素画路径用）。
+ * 返回"颜色 → 该类对应的 MARD 色号"的函数（平涂图用；像素画见 clusterPixels）。
  */
-function clusterColors(labs: Lab[], radius: number, keepHue = false): (lab: Lab) => string {
+function clusterColors(labs: Lab[], radius: number): (lab: Lab) => string {
   const q = (l: Lab) => `${Math.round(l[0] * 100)},${Math.round(l[1] * 200)},${Math.round(l[2] * 200)}`;
   const counts = new Map<string, { lab: Lab; n: number }>();
   for (const lab of labs) {
@@ -415,10 +431,8 @@ function clusterColors(labs: Lab[], radius: number, keepHue = false): (lab: Lab)
   for (const { lab } of [...counts.values()].sort((a, b) => b.n - a.n)) {
     if (centers.some(c => labDistance(c, lab) < radius)) continue;
     centers.push(lab);
-    // 黑白锚定：几乎无色的深色就是黑（H7），几乎无色的浅色就是白（H2）；
-    // 否则 #141414 这种"接近黑"会被配到深棕，眼睛就不黑了
-    const neutral = chroma(lab) < 0.02;
-    centerCode.push(neutral && lab[0] < 0.25 ? 'H7' : neutral && lab[0] > 0.93 ? 'H2' : keepHue ? nearestKeepingHue(lab) : nearest(lab).code);
+    // 黑白锚定：否则 #141414 这种"接近黑"会被配到深棕，眼睛就不黑了
+    centerCode.push(anchorCode(lab) ?? nearest(lab).code);
   }
   return lab => {
     let best = 0, bestD = Infinity;
@@ -428,6 +442,123 @@ function clusterColors(labs: Lab[], radius: number, keepHue = false): (lab: Lab)
     }
     return centerCode[best];
   };
+}
+
+// 黑白锚定：几乎无色的深色就是黑（H7），几乎无色的浅色就是白（H2）
+function anchorCode(lab: Lab): string | null {
+  const neutral = chroma(lab) < 0.02;
+  return neutral && lab[0] < 0.25 ? 'H7' : neutral && lab[0] > 0.93 ? 'H2' : null;
+}
+
+/** 像素画的颜色归类：每个主体像素属于第几类（和 clusterColors 同样的贪心聚类），-1 = 不是主体 */
+interface PixelClusters {
+  centers: Lab[];
+  sizes: number[];
+  index: Int32Array;
+}
+function clusterPixels(image: RgbaImage, mask: Mask | null, radius: number): PixelClusters {
+  const n = image.width * image.height;
+  const q = (l: Lab) => `${Math.round(l[0] * 100)},${Math.round(l[1] * 200)},${Math.round(l[2] * 200)}`;
+  const buckets = new Map<string, { lab: Lab; n: number; cluster: number }>();
+  const keyOf: (string | null)[] = new Array(n).fill(null);
+  for (let i = 0; i < n; i++) {
+    if ((mask ? mask.data[i] : image.data[i * 4 + 3] / 255) < 0.5) continue;
+    const lab = rgbToLab(image.data[i * 4], image.data[i * 4 + 1], image.data[i * 4 + 2]);
+    const k = (keyOf[i] = q(lab));
+    const e = buckets.get(k);
+    if (e) e.n++;
+    else buckets.set(k, { lab, n: 1, cluster: -1 });
+  }
+  const centers: Lab[] = [];
+  const ordered = [...buckets.values()].sort((a, b) => b.n - a.n);
+  for (const b of ordered) if (!centers.some(c => labDistance(c, b.lab) < radius)) centers.push(b.lab);
+  const sizes = new Array(centers.length).fill(0);
+  for (const b of ordered) {
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < centers.length; i++) {
+      const d = labDistance(centers[i], b.lab);
+      if (d < bestD) [best, bestD] = [i, d];
+    }
+    b.cluster = best;
+    sizes[best] += b.n;
+  }
+  const index = new Int32Array(n).fill(-1);
+  for (let i = 0; i < n; i++) if (keyOf[i]) index[i] = buckets.get(keyOf[i]!)!.cluster;
+  return { centers, sizes, index };
+}
+
+/**
+ * 描边只用一种色号。AI 画的像素图，同一条描边在源图里深深浅浅有好几种近似的颜色，各自配到最近的色号后
+ * 一条线上会混着三四种深色豆，看起来很花。做法：找出主描边色（够深、成线、用得多的那一类里最深的），
+ * 再把「贴着主描边、颜色也接近」的小类并进去，用同一个色号。
+ * 不贴着描边的深色（裤子、头发这种面，墙上的砖缝）不动；颜色差得远的（深蓝衣服自己的深蓝边）也不动。
+ */
+const OUTLINE_MAX_L = 0.5;        // 比这亮的不算描边
+const OUTLINE_MIN_SHARE = 0.01;   // 主描边至少占主体的这么多
+const OUTLINE_LINE_SHARE = 0.6;   // 主描边这一类里，至少这么多像素在 1–2 颗宽的线上
+const OUTLINE_NEAR = 0.1;         // 并进主描边的类，源图颜色离主描边不超过这么多
+const OUTLINE_TOUCH = 0.5;        // 并进主描边的类，至少这么多像素贴着主描边（8 邻）：描边边上深浅不匀的那几颗
+const OUTLINE_JOIN: [number, number] = [0.9, 0.3]; // 或者它自己几乎全是线（≥ 0.9）、又有这么多像素接着主描边：同一条描边里浅一点的那几段
+function outlineFamily(cl: PixelClusters, w: number, h: number): { main: number; members: number[] } | null {
+  const { centers, sizes, index } = cl;
+  const total = sizes.reduce((a, b) => a + b, 0);
+  // 每个像素所在的同类横向、纵向连续段有多长；短的那个 ≤ 2 就算在线上
+  const runH = new Uint16Array(w * h), runV = new Uint16Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w;) {
+      const k = index[y * w + x];
+      let x1 = x + 1;
+      while (x1 < w && index[y * w + x1] === k) x1++;
+      for (let i = x; i < x1; i++) runH[y * w + i] = Math.min(65535, x1 - x);
+      x = x1;
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h;) {
+      const k = index[y * w + x];
+      let y1 = y + 1;
+      while (y1 < h && index[y1 * w + x] === k) y1++;
+      for (let i = y; i < y1; i++) runV[i * w + x] = Math.min(65535, y1 - y);
+      y = y1;
+    }
+  }
+  const onLine = new Array(centers.length).fill(0);
+  for (let i = 0; i < w * h; i++) if (index[i] >= 0 && Math.min(runH[i], runV[i]) <= 2) onLine[index[i]]++;
+  let main = -1;
+  for (let k = 0; k < centers.length; k++) {
+    if (centers[k][0] > OUTLINE_MAX_L || sizes[k] < Math.max(8, total * OUTLINE_MIN_SHARE) || onLine[k] < sizes[k] * OUTLINE_LINE_SHARE) continue;
+    if (main < 0 || centers[k][0] < centers[main][0]) main = k;
+  }
+  if (main < 0) return null;
+  const touch = new Array(centers.length).fill(0);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const k = index[y * w + x];
+      if (k < 0 || k === main) continue;
+      let hit = false;
+      for (let dy = -1; dy <= 1 && !hit; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < w && ny < h && index[ny * w + nx] === main) { hit = true; break; }
+      }
+      if (hit) touch[k]++;
+    }
+  }
+  const members: number[] = [];
+  for (let k = 0; k < centers.length; k++) {
+    if (k === main || centers[k][0] > OUTLINE_MAX_L || sizes[k] > sizes[main]) continue;
+    if (labDistance(centers[k], centers[main]) > OUTLINE_NEAR) continue;
+    const joined = onLine[k] >= sizes[k] * OUTLINE_JOIN[0] && touch[k] >= sizes[k] * OUTLINE_JOIN[1];
+    if (touch[k] >= sizes[k] * OUTLINE_TOUCH || joined) members.push(k);
+  }
+  return { main, members };
+}
+
+/** 每一类源图颜色配一个色号；描边那几类用同一个（见 outlineFamily） */
+function beadsForClusters(cl: PixelClusters, w: number, h: number): string[] {
+  const codes = cl.centers.map(lab => anchorCode(lab) ?? nearestKeepingHue(lab));
+  const outline = outlineFamily(cl, w, h);
+  if (outline) for (const k of outline.members) codes[k] = codes[outline.main];
+  return codes;
 }
 
 /**
@@ -443,17 +574,8 @@ function generateFromPixelArt(input: PatternInput, options: PatternOptions): Gri
   const factor = Math.max(1, Math.ceil(bw / boxW), Math.ceil(bh / boxH));
   const gw = Math.ceil(bw / factor), gh = Math.ceil(bh / factor);
   // 色彩归一：JPEG 会把一块平涂色打散成几十种相近色。先把所有主体像素按颜色聚成几类，再把每一类配到色号。
-  const pixelLab = new Map<number, Lab>();
-  const labAt = (i: number) => {
-    let lab = pixelLab.get(i);
-    if (!lab) pixelLab.set(i, (lab = rgbToLab(image.data[i * 4], image.data[i * 4 + 1], image.data[i * 4 + 2])));
-    return lab;
-  };
-  const clusterCode = clusterColors(
-    [...Array(image.width * image.height).keys()].filter(i => (mask ? mask.data[i] : image.data[i * 4 + 3] / 255) >= 0.5).map(labAt),
-    PIXEL_ART_CLUSTER_RADIUS,
-    true,
-  );
+  const clusters = clusterPixels(image, mask, PIXEL_ART_CLUSTER_RADIUS);
+  const clusterCode = beadsForClusters(clusters, image.width, image.height);
   const codes: (string | null)[] = new Array(gw * gh).fill(null);
   for (let gy = 0; gy < gh; gy++) {
     for (let gx = 0; gx < gw; gx++) {
@@ -463,10 +585,9 @@ function generateFromPixelArt(input: PatternInput, options: PatternOptions): Gri
         for (let dx = 0; dx < factor; dx++) {
           const x = b.x0 + gx * factor + dx, y = b.y0 + gy * factor + dy;
           if (x >= b.x1 || y >= b.y1) continue;
-          const i = y * image.width + x;
-          const m = mask ? mask.data[i] : image.data[i * 4 + 3] / 255;
-          if (m < 0.5) continue;
-          const code = clusterCode(labAt(i));
+          const k = clusters.index[y * image.width + x];
+          if (k < 0) continue;
+          const code = clusterCode[k];
           tally.set(code, (tally.get(code) ?? 0) + 1);
         }
       }
@@ -477,6 +598,7 @@ function generateFromPixelArt(input: PatternInput, options: PatternOptions): Gri
     }
   }
   let out = mergeNearDuplicates(codes, 0.035); // 只合并 JPEG 噪点级别的差异
+  out = mergeFaintSpecks(out, gw, gh); // 面里和底色只差一点深浅的 1–2 颗碎块并回底色
   out = mergeRareColors(out, MIN_BEADS_PER_COLOR);
   out = capColors(out, options.maxColors ?? MAX_COLORS); // 像素画一格一豆还原，颜色按作者画的来，不按豆板砍
   return placeOnBoard(out, gw, gh, options.fit ? undefined : size.board);

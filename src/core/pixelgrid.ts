@@ -153,6 +153,11 @@ const LINE_COST = 0.3;           // 每放一条格线的代价（单位：平�
 const DEVIATION_COST = 1.0;      // 间距偏离格距的代价（每 100% 偏差扣一个单位）
 const HIGHPASS_HALF = 48;        // 自相关前去掉的慢变化成分的半窗
 const MIN_CELLS = 8, MAX_CELLS = 200;
+// 两个方向估的格距对不上时的重估（见 analyzeIrregularGrid）
+const RESCUE_PEAKS = 3;                // 每个方向取自相关最高的几个峰当候选格距
+const RESCUE_MIN_CONCENTRATION = 0.45; // 重估出来的网格验收更严，免得把卡通、截图认成像素画
+const RESCUE_MAX_EMPTY = 0.3;          // 没贴到边的格线最多占这么多（表情截图这类“大格子里套小图”的会超）
+const EMPTY_LINE = 0.15;               // 格线带内的边能量不到中位数的这么多，算没贴到边
 
 interface Gradients {
   dx: Float32Array; // dx[y*w+x]：像素 (x-1,y) 与 (x,y) 的色差，x=0 或任一方透明时为 0
@@ -199,7 +204,7 @@ function prefixSums(g: ArrayLike<number>): Float64Array {
 }
 
 /** 边能量剖面的自相关：峰的位置就是格距；峰谷差衡量周期性有多强（严格周期 → 1，平滑 / 随机 → 0） */
-function autocorrelation(g: Float64Array): { lag: number; periodicity: number } {
+function autocorrelation(g: Float64Array): { lag: number; periodicity: number; peaks: number[] } {
   const n = g.length;
   // 去掉慢变化（照片里"这片区域边多、那片边少"），只留格距尺度的起伏
   const cs = prefixSums(g);
@@ -211,7 +216,7 @@ function autocorrelation(g: Float64Array): { lag: number; periodicity: number } 
     den += hp[i] * hp[i];
   }
   const maxLag = Math.min(MAX_PITCH, Math.floor(n / 4));
-  if (!den || maxLag < MIN_PITCH) return { lag: 0, periodicity: 0 };
+  if (!den || maxLag < MIN_PITCH) return { lag: 0, periodicity: 0, peaks: [] };
   const ac = new Float64Array(maxLag + 1);
   for (let lag = 1; lag <= maxLag; lag++) {
     let s = 0;
@@ -223,7 +228,11 @@ function autocorrelation(g: Float64Array): { lag: number; periodicity: number } 
   const half = Math.ceil(lag / 2);
   let trough = Infinity;
   for (let l = Math.max(1, lag - half); l <= Math.min(maxLag, lag + half); l++) trough = Math.min(trough, ac[l]);
-  return { lag, periodicity: ac[lag] - trough };
+  // 其余的峰（局部最高点，从高到低）：格子大小浮动大的图，最高的峰不一定是真格距
+  const peaks: number[] = [];
+  for (let l = MIN_PITCH; l <= maxLag; l++) if (ac[l] > 0 && ac[l] >= ac[l - 1] && (l === maxLag || ac[l] >= ac[l + 1])) peaks.push(l);
+  peaks.sort((a, b) => ac[b] - ac[a]);
+  return { lag, periodicity: ac[lag] - trough, peaks: peaks.slice(0, RESCUE_PEAKS) };
 }
 
 /**
@@ -283,6 +292,16 @@ function concentration(g: Float64Array, lines: number[], band: number): number {
   return (onLines / total - coverage) / (1 - coverage);
 }
 
+/** 没贴到边的格线占比（不算首尾两条）：格距估小了，多摆的格线落在色块中间，这个值就高 */
+function emptyLines(g: Float64Array, lines: number[], band: number): number {
+  const cs = prefixSums(g);
+  const energy = lines.slice(1, -1).map(p => cs[Math.min(g.length, p + band + 1)] - cs[Math.max(0, p - band)]);
+  const positive = energy.filter(e => e > 0).sort((a, b) => a - b);
+  if (!positive.length) return 1;
+  const floor = EMPTY_LINE * positive[positive.length >> 1];
+  return energy.filter(e => e < floor).length / energy.length;
+}
+
 /** 内部平涂的格子占比：每格取中间一半区域，相邻像素平均色差低于 FLAT_DENSITY 算平涂；透明格不算 */
 function flatShare(grad: Gradients, width: number, xs: number[], ys: number[]): number {
   let flat = 0, cells = 0;
@@ -336,8 +355,26 @@ export function analyzeIrregularGrid(img: RgbaImage): IrregularAnalysis | null {
   const grad = computeGradients(img);
   const ax = autocorrelation(grad.gx), ay = autocorrelation(grad.gy);
   if (!ax.lag || !ay.lag) return null;
-  const pitch = (ax.lag + ay.lag) / 2;
-  const bx = placeLines(grad.gx, pitch), by = placeLines(grad.gy, pitch);
+  // 像素是方的：两个方向的格距要一致
+  const agree = Math.abs(ax.lag - ay.lag) <= Math.max(1, 0.15 * Math.max(ax.lag, ay.lag));
+  const fit = (pitch: number) => {
+    const bx = placeLines(grad.gx, pitch), by = placeLines(grad.gy, pitch);
+    const cx = concentration(grad.gx, bx.lines, bx.band), cy = concentration(grad.gy, by.lines, by.band);
+    const ex = emptyLines(grad.gx, bx.lines, bx.band), ey = emptyLines(grad.gy, by.lines, by.band);
+    // 好的格距：边都落在格线上（集中度高），格线也都贴着边（空线少）。格距估大了前者掉，估小了后者掉
+    return { pitch, bx, by, cx, cy, empty: Math.max(ex, ey), score: cx * (1 - ex) + cy * (1 - ey) };
+  };
+  let best = fit((ax.lag + ay.lag) / 2);
+  if (!agree) {
+    // 对不上：格子大小浮动大的 AI 像素场景（同一张图里一格 12 到 21 像素都有），自相关最高的峰会在一个方向上跑偏。
+    // 把两个方向排前几的峰（和它 ±1）都拿去摆格线，挑得分最高的；后面的验收也更严
+    const lags = [...ax.peaks, ...ay.peaks].flatMap(l => [l - 1, l, l + 1]).filter(l => l >= LARGE_CELL_PITCH);
+    for (const l of new Set(lags)) {
+      const t = fit(l);
+      if (t.score > best.score) best = t;
+    }
+  }
+  const { pitch, bx, by } = best;
   const cols = bx.lines.length - 1, rows = by.lines.length - 1;
   const result: IrregularAnalysis = {
     pitch,
@@ -345,19 +382,20 @@ export function analyzeIrregularGrid(img: RgbaImage): IrregularAnalysis | null {
     lagY: ay.lag,
     periodicityX: ax.periodicity,
     periodicityY: ay.periodicity,
-    concentrationX: concentration(grad.gx, bx.lines, bx.band),
-    concentrationY: concentration(grad.gy, by.lines, by.band),
+    concentrationX: best.cx,
+    concentrationY: best.cy,
     flatShare: flatShare(grad, img.width, bx.lines, by.lines),
     cols,
     rows,
     grid: null,
   };
-  // 像素是方的：两个方向的格距要一致
-  if (Math.abs(ax.lag - ay.lag) > Math.max(1, 0.15 * Math.max(ax.lag, ay.lag))) return result;
   if (cols < MIN_CELLS || rows < MIN_CELLS || cols > MAX_CELLS || rows > MAX_CELLS) return result;
   // 小格距只看周期性会把 JPEG 照片当成像素画（8×8 压缩块缩小后也有周期），所以两种格距都要求边集中在格线上
-  const concentrated = result.concentrationX >= MIN_CONCENTRATION && result.concentrationY >= MIN_CONCENTRATION;
-  const accepted = pitch < LARGE_CELL_PITCH
+  const need = agree ? MIN_CONCENTRATION : RESCUE_MIN_CONCENTRATION;
+  const concentrated = result.concentrationX >= need && result.concentrationY >= need;
+  const accepted = !agree
+    ? pitch >= LARGE_CELL_PITCH && concentrated && best.empty <= RESCUE_MAX_EMPTY && result.flatShare >= MIN_FLAT_SHARE
+    : pitch < LARGE_CELL_PITCH
     ? result.periodicityX >= MIN_PERIODICITY && result.periodicityY >= MIN_PERIODICITY && concentrated
     : concentrated && result.flatShare >= MIN_FLAT_SHARE;
   if (accepted) {
@@ -441,5 +479,87 @@ export function resampleOnGrid(img: RgbaImage, grid: PixelGrid): RgbaImage {
       out[o + 3] = alphaSum / n >= 128 ? 255 : 0;
     }
   }
+  keepThinLines(img, xs, ys, cols, rows, out);
   return { width: cols, height: rows, data: out };
+}
+
+/**
+ * 细线不断：AI 画的像素图里，眼镜框、口袋线、发丝这类深色线常常比一格细、也不在格子正中，
+ * 按格子中间的多数色取，线经过格子边上时这一格就读成了底色，线就断了。
+ * 这里补一遍：一格里深色（描边那么深）、又明显比它读出的颜色深的像素占到三成以上，就按这些深色像素取色。
+ * 只认深色的线：浅底上的红线、棕线这类中间调的细线不补（邮票内框那种两像素的细线会被补成半截、颜色也发灰）。
+ * 两种情况不补，免得把线撑粗、把色块撑大：
+ * - 深色像素偏在格子一侧，而那一侧的邻格本来就是深色（是旁边色块没对齐格线蹭进来的，不是线）；
+ * - 一条线正好骑在两格中间，两格都够三成：只留深色多的那一格。
+ * 格子太小（不到 8 像素）时不做：没有足够的像素判断。真正的像素画每格只有一种颜色，不受影响。
+ */
+const LINE_MIN_CELL = 8;
+const LINE_MIN_SHARE = 0.3;
+const LINE_MAX_L = 0.45;      // 线本身要这么深（Oklab 亮度）
+const LINE_DARKER = 0.2;      // 还要比这一格读出的颜色暗这么多
+const LINE_OFF_CENTER = 0.15; // 深色像素的重心偏离格子中心这么多（格宽的比例）算偏在一侧
+function keepThinLines(img: RgbaImage, xs: number[], ys: number[], cols: number, rows: number, out: Uint8ClampedArray): void {
+  // 每个像素都要算亮度，一张 1024 的图有一百万个：按 5 位 / 通道查表，同一档颜色只算一次
+  const lut = new Float32Array(32768).fill(-1);
+  const light = (i: number) => {
+    const r = img.data[i] >> 3, g = img.data[i + 1] >> 3, b = img.data[i + 2] >> 3;
+    const key = (r << 10) | (g << 5) | b;
+    if (lut[key] < 0) lut[key] = rgbToLab((r << 3) | 4, (g << 3) | 4, (b << 3) | 4)[0];
+    return lut[key];
+  };
+  const cellL = new Float32Array(cols * rows);
+  for (let k = 0; k < cols * rows; k++) cellL[k] = out[k * 4 + 3] ? rgbToLab(out[k * 4], out[k * 4 + 1], out[k * 4 + 2])[0] : -1;
+  interface Line { share: number; rgb: [number, number, number]; dx: number; dy: number }
+  const found = new Map<number, Line>();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const k = r * cols + c;
+      const x0 = Math.round(xs[c]), x1 = Math.min(img.width, Math.round(xs[c + 1]));
+      const y0 = Math.round(ys[r]), y1 = Math.min(img.height, Math.round(ys[r + 1]));
+      if (cellL[k] < 0 || x1 - x0 < LINE_MIN_CELL || y1 - y0 < LINE_MIN_CELL) continue;
+      let n = 0, dark = 0, rs = 0, gs = 0, bs = 0, sx = 0, sy = 0;
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          const i = (y * img.width + x) * 4;
+          if (img.data[i + 3] < 128) continue;
+          n++;
+          const l = light(i);
+          if (l > LINE_MAX_L || cellL[k] - l < LINE_DARKER) continue;
+          dark++;
+          rs += img.data[i];
+          gs += img.data[i + 1];
+          bs += img.data[i + 2];
+          sx += x + 0.5;
+          sy += y + 0.5;
+        }
+      }
+      if (!n || dark < n * LINE_MIN_SHARE) continue;
+      found.set(k, {
+        share: dark / n,
+        rgb: [Math.round(rs / dark), Math.round(gs / dark), Math.round(bs / dark)],
+        dx: (sx / dark - (x0 + x1) / 2) / (x1 - x0),
+        dy: (sy / dark - (y0 + y1) / 2) / (y1 - y0),
+      });
+    }
+  }
+  for (const [k, line] of found) {
+    const c = k % cols, r = (k - c) / cols;
+    const lineL = rgbToLab(...line.rgb)[0];
+    // 深色像素偏向哪一侧，就看那一侧的邻格
+    const sides: Array<[number, number]> = [];
+    if (Math.abs(line.dx) > LINE_OFF_CENTER) sides.push([Math.sign(line.dx), 0]);
+    if (Math.abs(line.dy) > LINE_OFF_CENTER) sides.push([0, Math.sign(line.dy)]);
+    let keep = true;
+    for (const [dx, dy] of sides) {
+      const nc = c + dx, nr = r + dy;
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const j = nr * cols + nc;
+      const other = found.get(j);
+      if (other ? other.share > line.share || (other.share === line.share && j < k) : cellL[j] >= 0 && cellL[j] - lineL < LINE_DARKER / 2) keep = false;
+    }
+    if (!keep) continue;
+    out[k * 4] = line.rgb[0];
+    out[k * 4 + 1] = line.rgb[1];
+    out[k * 4 + 2] = line.rgb[2];
+  }
 }

@@ -4,10 +4,12 @@ import { SIZES, boardFor, boardLabel } from '../src/core/config';
 import { validatePatternData } from '../src/ui/pngData';
 import { commit, copyRect, fitOnBoard, growToFit, copySpot, denoise, fillRect, fillRegion, mirrorGrid, mirrorRect, moveRect, nearestOther, outlineGrid, paintCells, redo, reduceColors, removeColor, replaceColor, startHistory, stampBitmap, undo } from '../src/core/edit';
 import { stripChecker } from '../src/core/checker';
+import { mergeFaintSpecks } from '../src/core/cleanup';
 import { regularizeEdges, tidyEdges } from '../src/core/contour';
 import { contentBounds, createGrid, legendOf, placeOnBoard, type Grid } from '../src/core/grid';
 import { cleanMask, dominantBorderMask, plainBackgroundMask, type RgbaImage } from '../src/core/image';
-import { PALETTE, isValidCode, nearest } from '../src/core/palette';
+import { chroma } from '../src/core/color';
+import { PALETTE, colorOf, isValidCode, nearest } from '../src/core/palette';
 import { generatePattern } from '../src/core/pipeline';
 import { allPassed, validateGrid } from '../src/core/validate';
 
@@ -450,3 +452,69 @@ describe('等比缩放（选区）', () => {
     expect(left).toBe(right);
   });
 });
+
+/** 像素画测试图：1 像素 = 1 格，rows 里每个字符一种颜色 */
+function pixelImage(rows: string[], colors: Record<string, [number, number, number]>): RgbaImage {
+  const width = rows[0].length, height = rows.length;
+  const data = new Uint8ClampedArray(width * height * 4);
+  rows.forEach((row, y) => [...row].forEach((ch, x) => data.set([...colors[ch], 255], (y * width + x) * 4)));
+  return { width, height, data };
+}
+const pixelPattern = (image: RgbaImage) => generatePattern({ image, mask: null, pixelArt: true }, { size: 'small', style: 'sticker' });
+
+describe('像素画找色号', () => {
+  it('灰蓝配成深蓝，不配成深灰；真正的灰还是灰', () => {
+    const rows = Array.from({ length: 16 }, (_, y) => (y < 8 ? 'd' : 'g').repeat(16));
+    const codes = legendOf(pixelPattern(pixelImage(rows, { d: [66, 77, 98], g: [128, 128, 128] }))).map(l => l.code);
+    expect(codes).toContain('C12');
+    expect(codes).not.toContain('H5');
+    const grey = codes.find(c => c !== 'C12')!;
+    expect(chroma(colorOf(grey).lab)).toBeLessThan(0.03);
+  });
+  it('灰紫配成灰，不配成偏红的棕', () => {
+    const rows = Array.from({ length: 16 }, () => 'p'.repeat(16));
+    expect(legendOf(pixelPattern(pixelImage(rows, { p: [96, 85, 96] }))).map(l => l.code)).toEqual(['H5']);
+  });
+});
+
+describe('像素画描边', () => {
+  it('同一条描边里深浅不匀的几颗，和主描边用同一个色号', () => {
+    // 肤色底上一个 16×16 的方框：描边每 4 颗里有 1 颗浅一点的深棕
+    const rows = Array.from({ length: 24 }, (_, y) =>
+      Array.from({ length: 24 }, (_, x) => {
+        const edge = x >= 4 && x <= 19 && y >= 4 && y <= 19 && (x === 4 || x === 19 || y === 4 || y === 19);
+        return !edge ? 's' : (x + y) % 4 === 0 ? 'v' : 'o';
+      }).join(''));
+    const grid = pixelPattern(pixelImage(rows, { s: [253, 220, 198], o: [53, 38, 39], v: [72, 45, 43] }));
+    expect(legendOf(grid).length).toBe(2);
+  });
+  it('不贴着描边的深色面（裤子）不并进描边', () => {
+    const rows = Array.from({ length: 24 }, (_, y) =>
+      Array.from({ length: 24 }, (_, x) => {
+        const edge = x >= 2 && x <= 21 && y >= 2 && y <= 21 && (x === 2 || x === 21 || y === 2 || y === 21);
+        return edge ? 'o' : x >= 6 && x <= 17 && y >= 6 && y <= 17 ? 'p' : 's';
+      }).join(''));
+    const grid = pixelPattern(pixelImage(rows, { s: [253, 220, 198], o: [53, 38, 39], p: [69, 58, 71] }));
+    expect(legendOf(grid).length).toBe(3);
+  });
+});
+
+describe('面里的碎点', () => {
+  const speck = (host: string, own: string, n: 1 | 2) => {
+    const g = createGrid(6, 6);
+    g.cells.fill(host);
+    g.cells[2 * 6 + 2] = own;
+    if (n === 2) g.cells[2 * 6 + 3] = own;
+    return mergeFaintSpecks(g.cells, 6, 6).filter(c => c === own).length;
+  };
+  it('和底色只差一点深浅的 1–2 颗并回底色', () => {
+    expect(speck('H5', 'H6', 2)).toBe(0);  // 深灰里的两颗更深的灰
+    expect(speck('M12', 'H5', 1)).toBe(0); // 都是深色，差得不多
+  });
+  it('腮红、眼睛、高光不并', () => {
+    expect(speck('G18', 'F16', 2)).toBe(2); // 肤色上的腮红
+    expect(speck('G18', 'H7', 1)).toBe(1);  // 眼睛
+    expect(speck('H5', 'H2', 1)).toBe(1);   // 深色上的高光
+  });
+});
+
