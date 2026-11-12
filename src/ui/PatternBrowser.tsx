@@ -88,7 +88,7 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
   const library = series.length > 0;
   const [query, setQuery] = useState('');
   const seriesOf = useMemo(() => new Map(series.flatMap(s => s.items.map(i => [i.id, s.name] as const))), [series]);
-  // 图纸库默认是一面「文件夹」：一个系列一个文件夹（不成系列的单张收在一个里），点一下打开；上面一排大类只是把文件夹筛少一点。
+  // 图纸库默认是一面「文件夹」：一个系列一个文件夹（不成系列的收在「散装」里），点一下打开；上面一排大类只是把文件夹筛少一点。
   // 我的收藏没有系列：一排大类、一排标签。尺寸是搜索框旁边的下拉
   const [cat, setCat] = useState<string | null>(null);
   const [sub, setSub] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
   const folders = useMemo((): SeriesGroup[] => {
     if (!library) return [];
     const singles = ordered.filter(i => !seriesOf.has(i.id));
-    return [...series, ...(singles.length ? [{ id: SINGLES, name: '单张', items: singles }] : [])];
+    return [...series, ...(singles.length ? [{ id: SINGLES, name: '散装', items: singles }] : [])];
   }, [library, series, ordered, seriesOf]);
   const openFolder = folders.find(f => f.id === open) ?? null;
 

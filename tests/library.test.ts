@@ -27,6 +27,11 @@ describe('系列', () => {
     expect(singles.map(p => p.id)).toEqual(['solo', 'latte', 'mocha']);
   });
 
+  it('系列可以置顶，没写就没有这个字段', () => {
+    const lib = parseLibrary({ series: [{ ...cats, pinned: true }, { id: 'drinks', name: '饮品', pinned: 'yes' }], patterns: [] });
+    expect(lib.series.map(s => s.pinned)).toEqual([true, undefined]);
+  });
+
   it('没有系列清单的旧文件照样能读', () => {
     const lib = parseLibrary({ v: 1, patterns: [pattern('a')] });
     expect(lib.series).toEqual([]);

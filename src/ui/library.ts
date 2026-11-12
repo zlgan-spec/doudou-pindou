@@ -63,6 +63,8 @@ export interface LibrarySeries {
   note: string;
   /** 封面用哪张图纸（图纸 id），不写或找不到就用系列里第一张 */
   cover: string | null;
+  /** 置顶：热门的系列排在图纸库最前面（几个都置顶时按清单先后） */
+  pinned?: boolean;
 }
 
 export interface Library {
@@ -136,7 +138,7 @@ function decodeSeries(o: Record<string, unknown>): LibrarySeries | null {
   const id = text(o.id, 40), name = text(o.name, 20);
   if (!ID.test(id) || !name) return null;
   const cover = text(o.cover, 40);
-  return { id, name, note: text(o.note, 60), cover: ID.test(cover) ? cover : null };
+  return { id, name, note: text(o.note, 60), cover: ID.test(cover) ? cover : null, ...(o.pinned === true ? { pinned: true } : {}) };
 }
 
 const objects = (list: unknown): Record<string, unknown>[] => (Array.isArray(list) ? list.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object') : []);

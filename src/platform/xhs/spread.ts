@@ -1,5 +1,5 @@
 // 帮账号拉人的两个平台接口（小工具版）：发笔记 postNote（§3.3）、关注作者 followAuthor / getFollowStatus（§3.15，客户端 9.51+）。
-// 分享不做：容器右上角自带分享按钮（getWindowInfo.menuButtons.share），2026-11-09 Ruby 真机确认后删掉。
+// 分享不做：容器右上角自带分享按钮（getWindowInfo.menuButtons.share），2026-11-09 真机确认后删掉。
 // 两个都先探测方法存在、版本够不够，不够就当没有：入口不出现、不报错。启动时 initSpread() 查一次（在 initStorage 之后，要读 kv）。
 import { buildVersion, kv } from './kv';
 import type { NoteAction } from '../types';

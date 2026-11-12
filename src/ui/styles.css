@@ -605,7 +605,8 @@ a { color: inherit; }
 .search-row { display: flex; gap: 8px; }
 .search-row .search { flex: 1; min-width: 0; }
 /* 尺寸下拉：和搜索框同高的胶囊，放在它右边 */
-.size-pick { flex: none; height: 52px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
+/* 不用系统自带的下拉箭头（它紧贴右边，圆角里看着像被切了一块），自己画一个，离边 18px */
+.size-pick { flex: none; height: 52px; padding: 0 40px 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 12 12%22 fill=%22none%22 stroke=%22%238a8a8a%22 stroke-width=%221.6%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M2.5 4.5 6 8l3.5-3.5%22/%3E%3C/svg%3E") no-repeat right 18px center / 12px; color: var(--ink); font: inherit; font-size: 14px; appearance: none; -webkit-appearance: none; cursor: pointer; }
 .size-pick:focus-visible { outline: none; border-color: var(--ink); box-shadow: 0 0 0 4px var(--fill); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 /* 第二排（系列和标签）：比第一排轻一档，只描边 */
