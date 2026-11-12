@@ -26,25 +26,20 @@ export function primaryCategory(tags: readonly string[]): string | null {
   return tags.find(t => CATEGORY_TAGS.includes(t)) ?? null;
 }
 
-/** 图纸库的标签至少几张才单独出一个按钮；不够的搜索照样搜得到 */
-export const TAG_CHIP_MIN = 5;
-
 export interface FilterChip { name: string; n: number }
-export interface FilterItem { id: string; tags: readonly string[]; size: string | null; series: string | null }
+export interface FilterItem { id: string; tags: readonly string[]; size: string | null }
 
 /**
- * 筛选分两排：第一排大类（单选），第二排跟着大类变：这个大类下的系列在前，再接够数的细分 / 用途标签。
- * 选「全部」（cat 为 null）时第二排只有标签，不列系列（系列太多，先选大类再看）。和系列、大类同名的标签不重复出。
+ * 筛选按钮：cats 是大类（单选，按每张图纸的大类数）；subs 是选中大类下的细分 / 用途标签（我的收藏用，图纸库看文件夹不用这排）；
+ * sizes 是有图纸的豆板尺寸。整个范围都有的标签不出（点了等于没筛）
  */
-export function buildFilters(items: readonly FilterItem[], seriesNames: readonly string[], cat: string | null, minTag: number): { cats: FilterChip[]; subs: FilterChip[]; sizes: FilterChip[] } {
+export function buildFilters(items: readonly FilterItem[], cat: string | null): { cats: FilterChip[]; subs: FilterChip[]; sizes: FilterChip[] } {
   const count = (list: readonly FilterItem[], f: (i: FilterItem) => boolean) => list.filter(f).length;
   const cats = [...CATEGORY_TAGS].map(name => ({ name, n: count(items, i => primaryCategory(i.tags) === name) })).filter(c => c.n > 0);
   const scope = cat ? items.filter(i => primaryCategory(i.tags) === cat) : items;
-  const series = cat ? seriesNames.map(name => ({ name, n: count(scope, i => i.series === name) })).filter(c => c.n > 0) : [];
-  const taken = new Set([...series.map(c => c.name), ...CATEGORY_TAGS]);
-  const tags = [...DETAIL_TAGS, ...USE_TAGS].filter(t => !taken.has(t)).map(name => ({ name, n: count(scope, i => i.tags.includes(name)) })).filter(c => c.n >= minTag && c.n < scope.length);
+  const subs = [...DETAIL_TAGS, ...USE_TAGS].filter(t => !CATEGORY_TAGS.includes(t)).map(name => ({ name, n: count(scope, i => i.tags.includes(name)) })).filter(c => c.n > 0 && c.n < scope.length);
   const sizes = Object.values(SIZES).map(s => ({ name: s.label, n: count(items, i => i.size === s.label) })).filter(c => c.n > 0);
-  return { cats, subs: [...series, ...tags], sizes };
+  return { cats, subs, sizes };
 }
 
 export interface LibraryPattern {

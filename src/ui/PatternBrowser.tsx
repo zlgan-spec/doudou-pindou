@@ -5,7 +5,7 @@ import { ScrollBar } from './ScrollBar';
 import { SIZES, boardLabel, type SizeId, type StyleId } from '../core/config';
 import { beadCount, legendOf, type Grid } from '../core/grid';
 import { renderSheet, sheetLayout } from '../render/sheet';
-import { buildFilters, primaryCategory, sizeOf, TAG_CHIP_MIN } from './library';
+import { buildFilters, primaryCategory, sizeOf } from './library';
 import { platform } from '@platform';
 import { setToastHost } from './NoteToast';
 import { embedPatternDataUrl, sheetFileName } from './pngData';
@@ -32,6 +32,8 @@ interface Props {
 }
 
 const ALL = '全部';
+/** 不成系列的单张收在这个文件夹里 */
+const SINGLES = 'singles';
 
 function sizeLabel(grid: Grid): string | null {
   const s = sizeOf(grid);
@@ -86,32 +88,52 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
   const library = series.length > 0;
   const [query, setQuery] = useState('');
   const seriesOf = useMemo(() => new Map(series.flatMap(s => s.items.map(i => [i.id, s.name] as const))), [series]);
-  // 筛选分两排：第一排大类，第二排是这个大类下的系列和标签；尺寸收成搜索框旁边的下拉。旧的系列网址打开时直接选中那个系列
-  const fromHash = useMemo(() => series.find(s => s.id === seriesOfHash()) ?? null, [series]);
-  const [cat, setCat] = useState<string | null>(() => (fromHash ? primaryCategory(fromHash.items[0]?.tags ?? []) : null));
-  const [sub, setSub] = useState<string | null>(() => fromHash?.name ?? null);
+  // 图纸库默认是一面「文件夹」：一个系列一个文件夹（不成系列的单张收在一个里），点一下打开；上面一排大类只是把文件夹筛少一点。
+  // 我的收藏没有系列：一排大类、一排标签。尺寸是搜索框旁边的下拉
+  const [cat, setCat] = useState<string | null>(null);
+  const [sub, setSub] = useState<string | null>(null);
   const [size, setSize] = useState('');
+  const [open, setOpen] = useState<string | null>(seriesOfHash);   // 打开的文件夹（系列 id）；网址 #/patterns/s/<id>，浏览器的后退就是合上
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = items.find(i => i.id === activeId) ?? null;
+  useEffect(() => {
+    const sync = () => setOpen(seriesOfHash());
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
+  // 打开文件夹从头看（换网址时整页本来就回顶）；合上回到刚才翻到的那一排
+  const wallY = useRef(0);
+  useLayoutEffect(() => { if (!open) window.scrollTo({ top: wallY.current, behavior: 'instant' }); }, [open]);
+
+  // 图纸库照排好的顺序（同一系列挨在一起）；我的收藏照自己的顺序
+  const ordered = useMemo(() => (library && allBlocks ? allBlocks.flat() : items), [library, allBlocks, items]);
+  const folders = useMemo((): SeriesGroup[] => {
+    if (!library) return [];
+    const singles = ordered.filter(i => !seriesOf.has(i.id));
+    return [...series, ...(singles.length ? [{ id: SINGLES, name: '单张', items: singles }] : [])];
+  }, [library, series, ordered, seriesOf]);
+  const openFolder = folders.find(f => f.id === open) ?? null;
 
   const filters = useMemo(() => buildFilters(
-    items.map(i => ({ id: i.id, tags: i.tags, size: sizeLabel(i.grid), series: seriesOf.get(i.id) ?? null })),
-    series.map(s => s.name), cat, library ? TAG_CHIP_MIN : 1,
-  ), [items, series, seriesOf, cat, library]);
-  const pickCat = (c: string | null) => { setCat(c); setSub(null); };
+    items.map(i => ({ id: i.id, tags: i.tags, size: sizeLabel(i.grid) })), library ? null : cat,
+  ), [items, cat, library]);
+  // 只改网址，open 跟着 hashchange 走：这样点按钮和按浏览器后退是同一条路
+  const go = (id: string | null) => { if (id) wallY.current = window.scrollY; window.location.hash = id ? `#/patterns/s/${id}` : '#/patterns'; };
+  const pickCat = (c: string | null) => { setCat(c); setSub(null); if (open) { wallY.current = 0; go(null); } };
 
-  // 图纸库照排好的顺序（同一系列挨在一起），筛出来的结果也保持这个先后；我的收藏照自己的顺序
-  const ordered = useMemo(() => (library && allBlocks ? allBlocks.flat() : items), [library, allBlocks, items]);
-  const list = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return ordered.filter(i => {
-      const s = seriesOf.get(i.id) ?? '';
-      if (cat && primaryCategory(i.tags) !== cat) return false;
-      if (sub && s !== sub && !i.tags.includes(sub)) return false;
-      if (size && sizeLabel(i.grid) !== size) return false;
-      return !q || i.name.toLowerCase().includes(q) || [...i.tags, sizeLabel(i.grid) ?? '', s].some(t => t && t.toLowerCase().includes(q));
-    });
-  }, [ordered, query, cat, sub, size, seriesOf]);
+  const q = query.trim().toLowerCase();
+  // 文件夹墙：没在搜、没选尺寸、没打开文件夹时
+  const wall = library && !q && !size && !openFolder;
+  const shownFolders = useMemo(() => folders
+    .map(f => (f.id === SINGLES && cat ? { ...f, items: f.items.filter(i => primaryCategory(i.tags) === cat) } : f))
+    .filter(f => f.items.length && (!cat || primaryCategory(f.items[0].tags) === cat)), [folders, cat]);
+  const list = useMemo(() => (q || !openFolder ? ordered : openFolder.items).filter(i => {
+    const s = seriesOf.get(i.id) ?? '';
+    if (cat && (q || !openFolder) && primaryCategory(i.tags) !== cat) return false;
+    if (sub && !i.tags.includes(sub)) return false;
+    if (size && sizeLabel(i.grid) !== size) return false;
+    return !q || i.name.toLowerCase().includes(q) || [...i.tags, sizeLabel(i.grid) ?? '', s].some(t => t && t.toLowerCase().includes(q));
+  }), [ordered, openFolder, q, cat, sub, size, seriesOf]);
   const blocks = useMemo(() => [list], [list]);
 
   // 大图里翻页的顺序 = 页面上从左到右、从上到下的顺序；首尾相接
@@ -150,10 +172,10 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
             </div>
           </>
         )}
-        {filters.subs.length > 0 && (
+        {!library && filters.subs.length > 0 && (
           <>
             <ScrollBar target={subsRef} axis="x" deps={[filters.subs.length, cat]} />
-            <div className="chips sub" ref={subsRef} role="tablist" aria-label={library ? '系列和标签' : '标签'}>
+            <div className="chips sub" ref={subsRef} role="tablist" aria-label="标签">
               {filters.subs.map(c => (
                 <button key={c.name} role="tab" aria-selected={sub === c.name} className={sub === c.name ? 'on' : ''} onClick={() => setSub(sub === c.name ? null : c.name)}>
                   {c.name}<small>{c.n}</small>
@@ -164,7 +186,30 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
         )}
       </div>
 
-      {!list.length ? (
+      {openFolder && !q && (
+        <div className="folder-head">
+          <button className="btn link" onClick={() => go(null)}>← 全部系列</button>
+          <b>{openFolder.name}</b><small>{openFolder.items.length}</small>
+        </div>
+      )}
+
+      {wall ? (
+        <ul className="folder-grid">
+          {shownFolders.map((f, i) => (
+            <li key={f.id} style={{ '--i': Math.min(i, 40) } as CSSProperties}>
+              <button className="folder" onClick={() => go(f.id)} aria-label={`打开 ${f.name}，${f.items.length} 张`}>
+                <span className="folder-back" aria-hidden />
+                <span className="folder-papers" aria-hidden>
+                  {f.items.slice(0, 3).map(it => <img key={it.id} src={it.thumb} alt="" />)}
+                </span>
+                <span className="folder-front"><b>{f.name}</b><small>{f.items.length}</small></span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {wall ? null : !list.length ? (
         <p className="color-hint">没有找到{query.trim() ? `「${query.trim()}」` : '这一类的图纸'}，换个{query.trim() ? '名字' : '筛选'}试试</p>
       ) : (
         // 图纸库的卡片比色卡大一些、只放图（用户主要看图）；我的收藏和色卡库同一套卡片
