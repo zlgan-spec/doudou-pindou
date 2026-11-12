@@ -7,7 +7,8 @@ import { stripChecker } from '../src/core/checker';
 import { regularizeEdges, tidyEdges } from '../src/core/contour';
 import { contentBounds, createGrid, legendOf, placeOnBoard, type Grid } from '../src/core/grid';
 import { cleanMask, dominantBorderMask, plainBackgroundMask, type RgbaImage } from '../src/core/image';
-import { PALETTE, isValidCode, nearest } from '../src/core/palette';
+import { chroma } from '../src/core/color';
+import { PALETTE, colorOf, isValidCode, nearest } from '../src/core/palette';
 import { generatePattern } from '../src/core/pipeline';
 import { allPassed, validateGrid } from '../src/core/validate';
 
@@ -450,3 +451,28 @@ describe('等比缩放（选区）', () => {
     expect(left).toBe(right);
   });
 });
+
+/** 像素画测试图：1 像素 = 1 格，rows 里每个字符一种颜色 */
+function pixelImage(rows: string[], colors: Record<string, [number, number, number]>): RgbaImage {
+  const width = rows[0].length, height = rows.length;
+  const data = new Uint8ClampedArray(width * height * 4);
+  rows.forEach((row, y) => [...row].forEach((ch, x) => data.set([...colors[ch], 255], (y * width + x) * 4)));
+  return { width, height, data };
+}
+const pixelPattern = (image: RgbaImage) => generatePattern({ image, mask: null, pixelArt: true }, { size: 'small', style: 'sticker' });
+
+describe('像素画找色号', () => {
+  it('灰蓝配成深蓝，不配成深灰；真正的灰还是灰', () => {
+    const rows = Array.from({ length: 16 }, (_, y) => (y < 8 ? 'd' : 'g').repeat(16));
+    const codes = legendOf(pixelPattern(pixelImage(rows, { d: [66, 77, 98], g: [128, 128, 128] }))).map(l => l.code);
+    expect(codes).toContain('C12');
+    expect(codes).not.toContain('H5');
+    const grey = codes.find(c => c !== 'C12')!;
+    expect(chroma(colorOf(grey).lab)).toBeLessThan(0.03);
+  });
+  it('灰紫配成灰，不配成偏红的棕', () => {
+    const rows = Array.from({ length: 16 }, () => 'p'.repeat(16));
+    expect(legendOf(pixelPattern(pixelImage(rows, { p: [96, 85, 96] }))).map(l => l.code)).toEqual(['H5']);
+  });
+});
+
