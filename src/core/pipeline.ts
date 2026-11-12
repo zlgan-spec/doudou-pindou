@@ -2,7 +2,7 @@
 // 步骤：取样 → 偏色修正和风格 → 按色族减色 → 每格投票 → 清理（保护关键细节）→ 勾轮廓 → 放到豆板。
 import { regularizeEdges, tidyEdges } from './contour';
 import { classifyInput, hasOwnOutline, type InputKind } from './classify';
-import { capColors, mergeNearDuplicates, mergeRareColors, mergeSmallRegions, protectDetails, removeIslands, detailColors } from './cleanup';
+import { capColors, mergeFaintSpecks, mergeNearDuplicates, mergeRareColors, mergeSmallRegions, protectDetails, removeIslands, detailColors } from './cleanup';
 import { chroma, labDistance, rgbToLab, type Lab } from './color';
 import { MAX_COLORS, MIN_BEADS_PER_COLOR, SIZES, STYLES, boardArea, fitSide, type SizeId, type StyleId } from './config';
 import { connectedRegions, createGrid, legendOf, type Grid } from './grid';
@@ -598,6 +598,7 @@ function generateFromPixelArt(input: PatternInput, options: PatternOptions): Gri
     }
   }
   let out = mergeNearDuplicates(codes, 0.035); // 只合并 JPEG 噪点级别的差异
+  out = mergeFaintSpecks(out, gw, gh); // 面里和底色只差一点深浅的 1–2 颗碎块并回底色
   out = mergeRareColors(out, MIN_BEADS_PER_COLOR);
   out = capColors(out, options.maxColors ?? MAX_COLORS); // 像素画一格一豆还原，颜色按作者画的来，不按豆板砍
   return placeOnBoard(out, gw, gh, options.fit ? undefined : size.board);

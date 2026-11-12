@@ -4,6 +4,7 @@ import { SIZES, boardFor, boardLabel } from '../src/core/config';
 import { validatePatternData } from '../src/ui/pngData';
 import { commit, copyRect, fitOnBoard, growToFit, copySpot, denoise, fillRect, fillRegion, mirrorGrid, mirrorRect, moveRect, nearestOther, outlineGrid, paintCells, redo, reduceColors, removeColor, replaceColor, startHistory, stampBitmap, undo } from '../src/core/edit';
 import { stripChecker } from '../src/core/checker';
+import { mergeFaintSpecks } from '../src/core/cleanup';
 import { regularizeEdges, tidyEdges } from '../src/core/contour';
 import { contentBounds, createGrid, legendOf, placeOnBoard, type Grid } from '../src/core/grid';
 import { cleanMask, dominantBorderMask, plainBackgroundMask, type RgbaImage } from '../src/core/image';
@@ -495,6 +496,25 @@ describe('像素画描边', () => {
       }).join(''));
     const grid = pixelPattern(pixelImage(rows, { s: [253, 220, 198], o: [53, 38, 39], p: [69, 58, 71] }));
     expect(legendOf(grid).length).toBe(3);
+  });
+});
+
+describe('面里的碎点', () => {
+  const speck = (host: string, own: string, n: 1 | 2) => {
+    const g = createGrid(6, 6);
+    g.cells.fill(host);
+    g.cells[2 * 6 + 2] = own;
+    if (n === 2) g.cells[2 * 6 + 3] = own;
+    return mergeFaintSpecks(g.cells, 6, 6).filter(c => c === own).length;
+  };
+  it('和底色只差一点深浅的 1–2 颗并回底色', () => {
+    expect(speck('H5', 'H6', 2)).toBe(0);  // 深灰里的两颗更深的灰
+    expect(speck('M12', 'H5', 1)).toBe(0); // 都是深色，差得不多
+  });
+  it('腮红、眼睛、高光不并', () => {
+    expect(speck('G18', 'F16', 2)).toBe(2); // 肤色上的腮红
+    expect(speck('G18', 'H7', 1)).toBe(1);  // 眼睛
+    expect(speck('H5', 'H2', 1)).toBe(1);   // 深色上的高光
   });
 });
 

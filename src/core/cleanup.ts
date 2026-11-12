@@ -102,6 +102,54 @@ export function mergeNearDuplicates(codes: Codes, threshold: number): Codes {
   return remap.size ? codes.map(c => (c && remap.get(c)) || c) : codes;
 }
 
+/**
+ * 面里的碎点：1–2 颗的小块，四周大半是同一种颜色，和它只是深浅差一点（色相、鲜艳程度几乎一样）就并回去。
+ * AI 画的像素图一块面里常有这种深浅不匀的碎点，拼出来很花。腮红、眼睛、高光这类有意的细节
+ * 颜色（色相 / 鲜艳程度）或明暗差得多，不会被并。
+ * 两颗都是深色时放宽：深色豆之间本来就难分（深灰裤子里的一颗深蓝、描边里的一颗深棕），差得不多就并。
+ */
+const SPECK_MAX = 2;
+const SPECK_HOST_SHARE = 0.6;  // 四周（4 邻）至少这么多是同一种颜色
+const SPECK_MAX_DL = 0.12;     // 明暗差不超过这么多
+const SPECK_MAX_DAB = 0.02;    // 色相 / 鲜艳程度的差不超过这么多
+const SPECK_DARK_L = 0.5;      // 两颗都比这暗算「都是深色」
+const SPECK_DARK_NEAR = 0.12;  // 都是深色时：找色号用的距离不超过这么多就并
+export function mergeFaintSpecks(codes: Codes, w: number, h: number): Codes {
+  let out = codes;
+  for (let round = 0; round < 3; round++) {
+    const next = out.slice();
+    let changed = false;
+    for (const region of connectedRegions({ width: w, height: h, cells: out }, (a, b) => a === b)) {
+      if (region.length > SPECK_MAX) continue;
+      const own = out[region[0]]!;
+      const around = new Map<string, number>();
+      let sides = 0;
+      for (const i of region) {
+        const x = i % w, y = (i - x) / w;
+        for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const c = out[ny * w + nx];
+          if (c === own) continue;
+          sides++;
+          if (c) around.set(c, (around.get(c) ?? 0) + 1);
+        }
+      }
+      let host = '', hostN = 0;
+      for (const [c, n] of around) if (n > hostN) [host, hostN] = [c, n];
+      if (!host || hostN < sides * SPECK_HOST_SHARE) continue;
+      const a = colorOf(own).lab, b = colorOf(host).lab;
+      const faint = Math.abs(a[0] - b[0]) <= SPECK_MAX_DL && Math.hypot(a[1] - b[1], a[2] - b[2]) <= SPECK_MAX_DAB;
+      const bothDark = a[0] <= SPECK_DARK_L && b[0] <= SPECK_DARK_L && matchDistance(a, b) <= SPECK_DARK_NEAR;
+      if (!faint && !bothDark) continue;
+      for (const i of region) next[i] = host;
+      changed = true;
+    }
+    if (!changed) break;
+    out = next;
+  }
+  return out;
+}
+
 /** 亮度权重更高的找色：深色小细节会并到深色，不会并到同色相的浅色 */
 function nearestByLightness(code: string, candidates: BeadColor[]): BeadColor {
   const lab = colorOf(code).lab;
