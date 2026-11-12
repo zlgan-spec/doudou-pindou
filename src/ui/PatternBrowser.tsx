@@ -150,7 +150,7 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
         <div className="search-row">
           <label className="search">
             <svg viewBox="0 0 24 24" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder={library ? '搜名字或系列，如 猫咪、货币' : '搜名字或标签，如 猫咪、杯垫'} maxLength={20} aria-label="搜索图纸" />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder={library ? '搜名字或系列' : '搜名字或标签'} maxLength={20} aria-label="搜索图纸" />
           </label>
           {filters.sizes.length > 1 && (
             <select className="size-pick" value={size} onChange={e => setSize(e.target.value)} aria-label="豆板尺寸">
