@@ -24,6 +24,24 @@ npm run build      # 类型检查 + 打包
 - 提交说明用 `feat:` / `fix:` / `docs:` / `chore:` 加一句话，例如 `fix: 修复缩放卡顿`
 - 改了出图逻辑，请确认 52 / 78 / 104 的出图结果没有意外变化，并跑一遍 `npm test`
 
+### 改界面：组件和档位
+
+整站是一套组件，数值只从档位里取。档位写在 `src/ui/styles.css` 开头的变量里（那里是唯一的一份，下面只说有哪几类）：
+
+| 类别 | 变量 | 用法 |
+|---|---|---|
+| 字号 | `--text-xs` 到 `--text-xl`、`--title-s` 到 `--title-l` | 正文五档、标题三档；首页大标题随屏宽变，是特例 |
+| 圆角 | `--radius-2xs` / `-xs` / `-s` / `--radius` / `--radius-pill` | 正圆用 `50%` |
+| 阴影 | `--shadow-0` 到 `--shadow-3`、`--shadow-up` | 浮起越高档位越大 |
+| 描边环 | `--ring-focus` / `--ring-selected` / `--ring-line` / `--edge-inset` | 聚焦、选中、细线框、彩色块内边线 |
+| 控件高度 | `--control-s` / `-m` / `-l` | 可点的按钮、输入框 |
+| 间距 | 不设变量 | 24px 以内用 2 的倍数，24–64px 用 4 的倍数 |
+
+- `npm test` 里的 `tests/style-scale.test.ts` 会查 `styles.css`：出现档位外的字号、圆角、阴影、间距就不通过。确实需要时，在同一行写注释 `/* 特例：原因 */`
+- 本地开发时打开 `http://localhost:5190/#/kit` 是组件页（不进正式版）：档位和现有组件都摆在上面。**新增组件先在 `src/ui/Kit.tsx` 登记一份**，和旁边的组件摆在一起看是不是一套
+- 新组件先看能不能用现有的 class 拼出来（按钮 `.btn`、分段 `.seg`、标签 `.chips`、卡片 `.color-grid`、文件夹 `.folder` 等），不够再加
+- 小工具要兼容老安卓：`aspect-ratio`、`inset` 简写这类新写法要么不用，要么配 `@supports` 回退
+
 ### 小红书小工具版
 
 同一份代码的另一个构建（`vite build --mode xhs`，产物在 `dist-xhs/`）：没有抠图模型和后台线程、图纸库打进包里（只带作者 DouDou、出处 AI 原创的图纸）、保存图纸走平台的存相册接口、兼容 Chrome 61。

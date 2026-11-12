@@ -1,7 +1,7 @@
 // 壳子：顶部导航（做豆图 / 图纸库 / 我的收藏 / 色卡库），下面是当前页。渠道有的话再加深浅色切换和仓库链接。
 // 路由用 hash（#/、#/make、#/patterns、#/mine、#/colors），纯静态托管不用配置。
 import { platform } from '@platform';
-import { useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import type { Note } from '../platform/types';
 import { Colors } from './Colors';
@@ -18,7 +18,9 @@ import { Patterns } from './Patterns';
 import { Terms } from './Terms';
 import type { PatternEntry } from './store';
 
-type Route = 'home' | 'make' | 'patterns' | 'mine' | 'colors' | 'terms';
+type Route = 'home' | 'make' | 'patterns' | 'mine' | 'colors' | 'terms' | 'kit';
+// 组件页只在本地开发时有（#/kit）：正式构建里这个判断恒为假，整页不会打进包
+const Kit = import.meta.env.DEV ? lazy(() => import('./Kit')) : null;
 const NO_NOTE: Note = { text: '' };
 
 // 手机上顶栏放不下四个字的「我的收藏」，「我的」在窄屏藏起来只显示「收藏」
@@ -33,6 +35,7 @@ function parse(hash: string): Route {
   if (hash.startsWith('#/make')) return 'make';
   if (hash.startsWith('#/colors')) return 'colors';
   if (hash.startsWith('#/terms')) return 'terms';
+  if (import.meta.env.DEV && hash.startsWith('#/kit')) return 'kit';
   // 旧地址（#/patterns/mine、#/resources、#/patterns/prompts）也认，收藏过链接的人不会落空
   if (hash.startsWith('#/mine') || hash.startsWith('#/patterns/mine')) return 'mine';
   if (hash.startsWith('#/patterns') || hash.startsWith('#/resources')) return 'patterns';
@@ -201,6 +204,7 @@ export function App() {
         {(route === 'patterns' || route === 'mine') && <Patterns tab={route === 'mine' ? 'mine' : 'library'} onOpen={open} />}
         {route === 'colors' && <Colors />}
         {route === 'terms' && <Terms backHash={backHash} />}
+        {Kit && route === 'kit' && <Suspense fallback={null}><Kit /></Suspense>}
         <footer className="frame-row foot">
           <div className="cell foot-in">
             <p className="fine">{platform.copy.footer}</p>
