@@ -476,3 +476,25 @@ describe('像素画找色号', () => {
   });
 });
 
+describe('像素画描边', () => {
+  it('同一条描边里深浅不匀的几颗，和主描边用同一个色号', () => {
+    // 肤色底上一个 16×16 的方框：描边每 4 颗里有 1 颗浅一点的深棕
+    const rows = Array.from({ length: 24 }, (_, y) =>
+      Array.from({ length: 24 }, (_, x) => {
+        const edge = x >= 4 && x <= 19 && y >= 4 && y <= 19 && (x === 4 || x === 19 || y === 4 || y === 19);
+        return !edge ? 's' : (x + y) % 4 === 0 ? 'v' : 'o';
+      }).join(''));
+    const grid = pixelPattern(pixelImage(rows, { s: [253, 220, 198], o: [53, 38, 39], v: [72, 45, 43] }));
+    expect(legendOf(grid).length).toBe(2);
+  });
+  it('不贴着描边的深色面（裤子）不并进描边', () => {
+    const rows = Array.from({ length: 24 }, (_, y) =>
+      Array.from({ length: 24 }, (_, x) => {
+        const edge = x >= 2 && x <= 21 && y >= 2 && y <= 21 && (x === 2 || x === 21 || y === 2 || y === 21);
+        return edge ? 'o' : x >= 6 && x <= 17 && y >= 6 && y <= 17 ? 'p' : 's';
+      }).join(''));
+    const grid = pixelPattern(pixelImage(rows, { s: [253, 220, 198], o: [53, 38, 39], p: [69, 58, 71] }));
+    expect(legendOf(grid).length).toBe(3);
+  });
+});
+

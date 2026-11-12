@@ -487,9 +487,78 @@ function clusterPixels(image: RgbaImage, mask: Mask | null, radius: number): Pix
   return { centers, sizes, index };
 }
 
-/** 每一类源图颜色配一个色号 */
-function beadsForClusters(cl: PixelClusters): string[] {
-  return cl.centers.map(lab => anchorCode(lab) ?? nearestKeepingHue(lab));
+/**
+ * 描边只用一种色号。AI 画的像素图，同一条描边在源图里深深浅浅有好几种近似的颜色，各自配到最近的色号后
+ * 一条线上会混着三四种深色豆，看起来很花。做法：找出主描边色（够深、成线、用得多的那一类里最深的），
+ * 再把「贴着主描边、颜色也接近」的小类并进去，用同一个色号。
+ * 不贴着描边的深色（裤子、头发这种面，墙上的砖缝）不动；颜色差得远的（深蓝衣服自己的深蓝边）也不动。
+ */
+const OUTLINE_MAX_L = 0.5;        // 比这亮的不算描边
+const OUTLINE_MIN_SHARE = 0.01;   // 主描边至少占主体的这么多
+const OUTLINE_LINE_SHARE = 0.6;   // 主描边这一类里，至少这么多像素在 1–2 颗宽的线上
+const OUTLINE_NEAR = 0.1;         // 并进主描边的类，源图颜色离主描边不超过这么多
+const OUTLINE_TOUCH = 0.5;        // 并进主描边的类，至少这么多像素贴着主描边（8 邻）：描边边上深浅不匀的那几颗
+const OUTLINE_JOIN: [number, number] = [0.9, 0.3]; // 或者它自己几乎全是线（≥ 0.9）、又有这么多像素接着主描边：同一条描边里浅一点的那几段
+function outlineFamily(cl: PixelClusters, w: number, h: number): { main: number; members: number[] } | null {
+  const { centers, sizes, index } = cl;
+  const total = sizes.reduce((a, b) => a + b, 0);
+  // 每个像素所在的同类横向、纵向连续段有多长；短的那个 ≤ 2 就算在线上
+  const runH = new Uint16Array(w * h), runV = new Uint16Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w;) {
+      const k = index[y * w + x];
+      let x1 = x + 1;
+      while (x1 < w && index[y * w + x1] === k) x1++;
+      for (let i = x; i < x1; i++) runH[y * w + i] = Math.min(65535, x1 - x);
+      x = x1;
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h;) {
+      const k = index[y * w + x];
+      let y1 = y + 1;
+      while (y1 < h && index[y1 * w + x] === k) y1++;
+      for (let i = y; i < y1; i++) runV[i * w + x] = Math.min(65535, y1 - y);
+      y = y1;
+    }
+  }
+  const onLine = new Array(centers.length).fill(0);
+  for (let i = 0; i < w * h; i++) if (index[i] >= 0 && Math.min(runH[i], runV[i]) <= 2) onLine[index[i]]++;
+  let main = -1;
+  for (let k = 0; k < centers.length; k++) {
+    if (centers[k][0] > OUTLINE_MAX_L || sizes[k] < Math.max(8, total * OUTLINE_MIN_SHARE) || onLine[k] < sizes[k] * OUTLINE_LINE_SHARE) continue;
+    if (main < 0 || centers[k][0] < centers[main][0]) main = k;
+  }
+  if (main < 0) return null;
+  const touch = new Array(centers.length).fill(0);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const k = index[y * w + x];
+      if (k < 0 || k === main) continue;
+      let hit = false;
+      for (let dy = -1; dy <= 1 && !hit; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < w && ny < h && index[ny * w + nx] === main) { hit = true; break; }
+      }
+      if (hit) touch[k]++;
+    }
+  }
+  const members: number[] = [];
+  for (let k = 0; k < centers.length; k++) {
+    if (k === main || centers[k][0] > OUTLINE_MAX_L || sizes[k] > sizes[main]) continue;
+    if (labDistance(centers[k], centers[main]) > OUTLINE_NEAR) continue;
+    const joined = onLine[k] >= sizes[k] * OUTLINE_JOIN[0] && touch[k] >= sizes[k] * OUTLINE_JOIN[1];
+    if (touch[k] >= sizes[k] * OUTLINE_TOUCH || joined) members.push(k);
+  }
+  return { main, members };
+}
+
+/** 每一类源图颜色配一个色号；描边那几类用同一个（见 outlineFamily） */
+function beadsForClusters(cl: PixelClusters, w: number, h: number): string[] {
+  const codes = cl.centers.map(lab => anchorCode(lab) ?? nearestKeepingHue(lab));
+  const outline = outlineFamily(cl, w, h);
+  if (outline) for (const k of outline.members) codes[k] = codes[outline.main];
+  return codes;
 }
 
 /**
@@ -506,7 +575,7 @@ function generateFromPixelArt(input: PatternInput, options: PatternOptions): Gri
   const gw = Math.ceil(bw / factor), gh = Math.ceil(bh / factor);
   // 色彩归一：JPEG 会把一块平涂色打散成几十种相近色。先把所有主体像素按颜色聚成几类，再把每一类配到色号。
   const clusters = clusterPixels(image, mask, PIXEL_ART_CLUSTER_RADIUS);
-  const clusterCode = beadsForClusters(clusters);
+  const clusterCode = beadsForClusters(clusters, image.width, image.height);
   const codes: (string | null)[] = new Array(gw * gh).fill(null);
   for (let gy = 0; gy < gh; gy++) {
     for (let gx = 0; gx < gw; gx++) {
