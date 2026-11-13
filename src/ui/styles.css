@@ -601,8 +601,8 @@ a { color: inherit; }
 .viewer-close { flex: none; width: 32px; height: 32px; border: 0; border-radius: var(--radius-pill); background: var(--fill); color: var(--ink); display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
 .viewer-close:hover { background: var(--line); }
 .viewer-close svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.viewer-tags { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.viewer-tags span { padding: 4px 10px; border-radius: var(--radius-pill); background: var(--fill); font-size: var(--text-s); color: var(--muted); }
+.viewer-tags { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.viewer-tags > span:not(.seg) { padding: 4px 10px; border-radius: var(--radius-pill); background: var(--fill); font-size: var(--text-s); color: var(--muted); }
 .viewer-facts { margin: 0; border-top: 1px solid var(--line); }
 .viewer-facts div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: var(--text-m); }
 .viewer-facts dt { flex: none; color: var(--muted); }

@@ -19,6 +19,8 @@ export interface BrowserItem {
   thumb: string;
   /** 作者 · 出处，图纸库才有 */
   credit?: ReactNode;
+  /** 同一张图的各个尺寸（含自己，从小到大）。有的话大图里能切换，下载、收藏、拿去改都跟着选中的尺寸走 */
+  sizes?: BrowserItem[];
 }
 
 interface Props {
@@ -131,7 +133,7 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
     const s = seriesOf.get(i.id) ?? '';
     if (cat && (q || !openFolder) && primaryCategory(i.tags) !== cat) return false;
     if (sub && !i.tags.includes(sub)) return false;
-    if (size && sizeLabel(i.grid) !== size) return false;
+    if (size && !(i.sizes ?? [i]).some(v => sizeLabel(v.grid) === size)) return false;
     return !q || i.name.toLowerCase().includes(q) || [...i.tags, sizeLabel(i.grid) ?? '', s].some(t => t && t.toLowerCase().includes(q));
   }), [ordered, openFolder, q, cat, sub, size, seriesOf]);
   const blocks = useMemo(() => [list], [list]);
@@ -222,7 +224,7 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
         </div>
       )}
 
-      {active && <Viewer item={active} actions={actions} onClose={() => setActiveId(null)} onStep={order.length > 1 ? step : undefined} />}
+      {active && <Viewer item={active} prefer={size} actions={actions} onClose={() => setActiveId(null)} onStep={order.length > 1 ? step : undefined} />}
     </>
   );
 }
@@ -389,8 +391,13 @@ function SheetStage({ item }: { item: BrowserItem }) {
  * 大图弹窗。左右两边的箭头、键盘 ← ↑ / → ↓ 翻到上一张 / 下一张，顺序和页面上排的一样，首尾相接一直能翻。
  * 不用滚轮和滑动翻页：触控板缩放、拖动看图时容易误翻
  */
-function Viewer({ item, actions, onClose, onStep }: { item: BrowserItem; actions: Props['actions']; onClose: () => void; onStep?: (d: 1 | -1) => void }) {
+function Viewer({ item: card, prefer, actions, onClose, onStep }: { item: BrowserItem; prefer?: string; actions: Props['actions']; onClose: () => void; onStep?: (d: 1 | -1) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  // 同一张图有几个尺寸：默认看卡片上的那个（正按尺寸筛选时看筛的那个），在信息栏里切换。换一张图就回到默认
+  const [picked, setPicked] = useState<{ card: string; id: string } | null>(null);
+  const item = card.sizes?.find(v => v.id === (picked?.card === card.id ? picked.id : null))
+    ?? card.sizes?.find(v => prefer && sizeLabel(v.grid) === prefer)
+    ?? card;
 
   useEffect(() => {
     dialog.current?.showModal();
@@ -465,8 +472,19 @@ function Viewer({ item, actions, onClose, onStep }: { item: BrowserItem; actions
             <svg viewBox="0 0 24 24" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
-        {(item.tags.length > 0 || size) && (
-          <p className="viewer-tags">{[...(size ? [size] : []), ...item.tags].map(t => <span key={t}>{t}</span>)}</p>
+        {(item.tags.length > 0 || size || card.sizes) && (
+          <p className="viewer-tags">
+            {card.sizes ? (
+              <span className="seg mini" role="radiogroup" aria-label="豆板尺寸">
+                {card.sizes.map(v => (
+                  <button key={v.id} role="radio" aria-checked={v.id === item.id} className={v.id === item.id ? 'on' : ''} onClick={() => setPicked({ card: card.id, id: v.id })}>
+                    {sizeLabel(v.grid) ?? `${v.grid.width}×${v.grid.height}`}
+                  </button>
+                ))}
+              </span>
+            ) : size && <span>{size}</span>}
+            {item.tags.map(t => <span key={t}>{t}</span>)}
+          </p>
         )}
         <dl className="viewer-facts">
           <div><dt>豆板</dt><dd>{boardLabel(item.grid.width, item.grid.height)}</dd></div>

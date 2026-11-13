@@ -92,6 +92,7 @@ const entry = {
   author: args.author ?? '',
   source: args.source ?? '',
   ...(args.link ? { link: args.link } : {}),
+  ...(args['variant-of'] ? { variantOf: args['variant-of'] } : {}),
   addedAt: new Date().toISOString().slice(0, 10),
   mirrored: data.mirrored === true,
   colors,
@@ -100,6 +101,11 @@ const entry = {
 
 const INDEX = args.index ? resolve(args.index) : resolve(ROOT, 'public/patterns/index.json');
 const index = JSON.parse(readFileSync(INDEX, 'utf8'));
+if (args['variant-of'] !== undefined) {
+  const main = index.patterns.find(p => p.id === args['variant-of']);
+  if (!main || main.variantOf) fail(`--variant-of 要写一张已经在库里的图纸的 id（它自己不能是别人的另一个尺寸），没找到「${args['variant-of']}」。`);
+  if (args['variant-of'] === args.id) fail('--variant-of 不能指向自己。');
+}
 const at = index.patterns.findIndex(p => p.id === entry.id);
 // 系列：写了 --series 就用它；更新已有的一张没写 --series 时保留原来的系列
 const seriesList = (index.series ??= []);

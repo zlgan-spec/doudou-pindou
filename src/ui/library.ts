@@ -54,6 +54,8 @@ export interface LibraryPattern {
   grid: Grid;
   /** 属于哪个系列（系列 id），不属于写 null */
   series: string | null;
+  /** 这是哪一张图纸的另一个尺寸（那张的 id）。图纸库里不单独出卡片，在那张的大图里切换；不是就写 null */
+  variantOf: string | null;
 }
 
 export interface LibrarySeries {
@@ -131,6 +133,7 @@ function decode(o: Record<string, unknown>): LibraryPattern | null {
     mirrored: o.mirrored === true,
     grid,
     series: ID.test(text(o.series, 40)) ? text(o.series, 40) : null,
+    variantOf: ID.test(text(o.variantOf, 40)) ? text(o.variantOf, 40) : null,
   };
 }
 
@@ -160,7 +163,21 @@ export function parseLibrary(data: unknown): Library {
     seen.add(p.id);
     return [{ ...p, series: series.some(sr => sr.id === p.series) ? p.series : null }];
   });
-  return { patterns, series };
+  // 另一个尺寸必须指向一张真的在库里、自己不是「另一个尺寸」的图纸，否则当成普通的一张
+  const mains = new Set(patterns.filter(p => !p.variantOf).map(p => p.id));
+  return { patterns: patterns.map(p => (p.variantOf && !mains.has(p.variantOf) ? { ...p, variantOf: null } : p)), series };
+}
+
+/** 同一张图的各个尺寸：主图加上指向它的那些，从小到大排。只有一个尺寸的不在返回里 */
+export function sizeVariants(patterns: readonly LibraryPattern[]): Map<string, LibraryPattern[]> {
+  const out = new Map<string, LibraryPattern[]>();
+  for (const p of patterns) {
+    if (!p.variantOf) continue;
+    const main = patterns.find(m => m.id === p.variantOf);
+    if (main) out.set(main.id, [...(out.get(main.id) ?? [main]), p]);
+  }
+  for (const list of out.values()) list.sort((a, b) => a.grid.width * a.grid.height - b.grid.width * b.grid.height);
+  return out;
 }
 
 /** 按系列分组：够张数的系列按清单顺序排，系列里按图纸在文件里的先后；其余都是单张 */

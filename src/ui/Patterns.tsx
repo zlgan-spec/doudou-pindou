@@ -1,8 +1,9 @@
 // 图纸库（整理好的现成图纸，public/patterns/index.json）和我的收藏（收藏过的图纸）：顶部导航里各占一个按钮，页面没有页头，打开就是搜索和图纸。
 import { platform } from '@platform';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SIZES } from '../core/config';
 import { contentBounds, type Grid } from '../core/grid';
-import { categoryRank, groupSeries, loadLibrary, sizeOf, type Library as LibraryData, type LibraryPattern } from './library';
+import { categoryRank, groupSeries, loadLibrary, sizeOf, sizeVariants, type Library as LibraryData, type LibraryPattern } from './library';
 import { Mine } from './Mine';
 import { NoteToast } from './NoteToast';
 import { downloadSheet, PatternBrowser, type BrowserItem, type SeriesGroup } from './PatternBrowser';
@@ -36,15 +37,28 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
     return subscribe(() => setStarred(listPatterns()));
   }, []);
 
-  const items = useMemo((): BrowserItem[] => (patterns ?? []).map(p => ({
-    id: p.id, name: p.name, tags: p.tags, grid: p.grid, mirrored: p.mirrored, thumb: libraryThumb(p.id, p.grid), // 卡片只画有豆子的部分，图更大、细节看得清
-    credit: p.author || p.source ? (
-      <>
-        {[p.author, p.source].filter(Boolean).join(' · ')}
-        {p.link && platform.caps.externalLinks && <> · <a href={p.link} target="_blank" rel="noreferrer noopener">原图</a></>}
-      </>
-    ) : undefined,
-  })), [patterns]);
+  // 同一张图有几个尺寸时只出一张卡片：主图带上各个尺寸，在大图里切换
+  const items = useMemo((): BrowserItem[] => {
+    const all = patterns ?? [];
+    const one = (p: LibraryPattern): BrowserItem => ({
+      id: p.id, name: p.name, tags: p.tags, grid: p.grid, mirrored: p.mirrored, thumb: libraryThumb(p.id, p.grid), // 卡片只画有豆子的部分，图更大、细节看得清
+      credit: p.author || p.source ? (
+        <>
+          {[p.author, p.source].filter(Boolean).join(' · ')}
+          {p.link && platform.caps.externalLinks && <> · <a href={p.link} target="_blank" rel="noreferrer noopener">原图</a></>}
+        </>
+      ) : undefined,
+    });
+    const sizes = sizeVariants(all);
+    return all.filter(p => !p.variantOf).map(p => ({ ...one(p), sizes: sizes.get(p.id)?.map(v => ({ ...one(v), name: p.name })) }));
+  }, [patterns]);
+
+  // 有几个尺寸的图纸：下载的文件名和收藏里的名字带上尺寸，几份才分得开
+  const multi = useMemo(() => new Set([...sizeVariants(patterns ?? []).values()].flat().map(p => p.id)), [patterns]);
+  const sized = (p: LibraryPattern): LibraryPattern => {
+    const size = sizeOf(p.grid);
+    return multi.has(p.id) && size ? { ...p, name: `${p.name} ${SIZES[size].label}` } : p;
+  };
 
   // 「全部」的摆法（用户先按喜好找大类，再看一套套的系列）：
   // 0. 置顶的系列（index.json 里 pinned: true，放热门的）排最前
@@ -55,7 +69,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
     if (!lib) return { series: [], blocks: [] };
     const byId = new Map(items.map(i => [i.id, i]));
     const latest = (ps: LibraryPattern[]) => ps.reduce((m, p) => (p.addedAt > m ? p.addedAt : m), '');
-    const { groups, singles } = groupSeries(lib);
+    const { groups, singles } = groupSeries({ ...lib, patterns: lib.patterns.filter(p => !p.variantOf) });
     const ordered = groups
       .map((g, order) => ({ ...g, rank: categoryRank(g.patterns[0].tags), date: latest(g.patterns), order }))
       .sort((a, b) => Number(!!b.series.pinned) - Number(!!a.series.pinned) || a.rank - b.rank || b.date.localeCompare(a.date) || a.order - b.order);
@@ -88,7 +102,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
       if (window.confirm(`取消收藏「${mine.name}」？取消后找不回来。`)) deletePattern(mine.id);
       return;
     }
-    const e = toEntry(p);
+    const e = toEntry(sized(p));
     setNote(createPattern({ name: e.name, size: e.size, style: e.style, fullBoard: e.fullBoard, mirrored: e.mirrored, grid: e.grid, tags: e.tags, libId: e.libId }) ? '' : platform.copy.storageFull('收藏不进去'));
   };
 
@@ -105,9 +119,9 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
           const isStarred = starred.some(e => e.libId === p.id);
           return (
             <>
-              <button className="btn primary pill" onClick={() => downloadSheet({ ...p, size: sizeOf(p.grid) ?? undefined })}>{platform.copy.sheetExportLabel}</button>
+              <button className="btn primary pill" onClick={() => downloadSheet({ ...sized(p), size: sizeOf(p.grid) ?? undefined })}>{platform.copy.sheetExportLabel}</button>
               <button className="btn pill" aria-pressed={isStarred} onClick={() => toggleStar(p)}>{isStarred ? '已收藏' : '收藏'}</button>
-              <button className="btn link" onClick={() => { close(); onOpen(toEntry(p), 'library'); }}>拿去改</button>
+              <button className="btn link" onClick={() => { close(); onOpen(toEntry(sized(p)), 'library'); }}>拿去改</button>
             </>
           );
         }}

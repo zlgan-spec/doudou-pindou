@@ -32,6 +32,16 @@ describe('系列', () => {
     expect(lib.series.map(s => s.pinned)).toEqual([true, undefined]);
   });
 
+  it('同一张图的其他尺寸：挂在主图上从小到大排，不单独成一张；指向不存在的图纸时当普通的一张', async () => {
+    const { sizeVariants } = await import('../src/ui/library');
+    const big = { ...pattern('cat-big'), rows: ['000', '000', '000'], variantOf: 'cat' };
+    const lib = parseLibrary({ series: [cats], patterns: [pattern('cat', 'golden-cat'), big, { ...pattern('lost'), variantOf: 'no-such' }, { ...pattern('chain'), variantOf: 'cat-big' }] });
+    expect(lib.patterns.map(p => [p.id, p.variantOf])).toEqual([['cat', null], ['cat-big', 'cat'], ['lost', null], ['chain', null]]);
+    const sizes = sizeVariants(lib.patterns);
+    expect([...sizes.keys()]).toEqual(['cat']);
+    expect(sizes.get('cat')!.map(p => p.id)).toEqual(['cat', 'cat-big']);
+  });
+
   it('没有系列清单的旧文件照样能读', () => {
     const lib = parseLibrary({ v: 1, patterns: [pattern('a')] });
     expect(lib.series).toEqual([]);

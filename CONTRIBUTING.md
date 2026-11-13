@@ -85,6 +85,7 @@ node scripts/add-pattern.mjs 图纸.png --id cat-cafe-coaster --tags 猫咪,杯�
 | `--tags` | 只能用 [`src/ui/tags.json`](src/ui/tags.json) 里的词，**第一个写大类**（见下）；尺寸标签自动给，不用写 |
 | `--name` | 不写就用 PNG 里存的名字 |
 | `--author` / `--source` / `--link` | 作者、出处、原图网址（只认 https） |
+| `--variant-of` | 这张是另一张图纸的另一个尺寸时，写那张的 id。图纸库里不单独出卡片，在那张的大图里切换尺寸；名字、标签、出处写成和那张一样 |
 | `--series` | 成套的图纸写系列 id；新系列第一次用时加 `--series-name 系列名`，可选 `--series-note 一句话说明` |
 
 ### 标签和排序
