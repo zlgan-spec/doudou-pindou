@@ -544,8 +544,8 @@ a { color: inherit; }
 .folder-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 20px 14px; }
 .folder-grid li { animation: enter-up 0.5s var(--ease-out) both; animation-delay: calc(var(--i) * 12ms); }
 .folder { position: relative; display: block; width: 100%; padding: 16px 0 0; border: 0; background: none; text-align: left; color: var(--ink); }
-.folder-back { position: absolute; top: 10px; left: 0; right: 0; bottom: 0; border: 1px solid var(--line); border-radius: var(--radius-xs) var(--radius) var(--radius) var(--radius); background: var(--fill); }
-.folder-back::before { content: ''; position: absolute; left: -1px; bottom: 100%; width: 36%; height: 10px; border: 1px solid var(--line); border-bottom: 0; border-radius: var(--radius-s) var(--radius-s) 0 0; background: var(--fill); }
+.folder-back { position: absolute; top: 10px; left: 0; right: 0; bottom: 0; border: 1px solid var(--line); border-radius: 0 var(--radius) var(--radius) var(--radius); background: var(--fill); } /* 左上角接着标签往下，不圆，左边线才连得上 */
+.folder-back::before { content: ''; position: absolute; left: -1px; bottom: calc(100% - 1px); width: 36%; /* 往下压一像素盖住底板的上边线，标签和底板连成一块 */ height: 10px; border: 1px solid var(--line); border-bottom: 0; border-radius: var(--radius-s) var(--radius-s) 0 0; background: var(--fill); }
 .folder-papers { position: relative; display: block; margin: 0 4%; height: 0; padding-top: 46%; } /* 高 = 文件夹宽的 46%（= 自己宽的一半）；不用 aspect-ratio，老安卓不认 */
 .folder-papers img { position: absolute; top: 0; bottom: 0; left: 25%; width: 50%; height: 100%; padding: 3%; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); object-fit: contain; image-rendering: pixelated; transform-origin: 50% 100%; transition: transform 0.3s var(--ease-out); }
 .folder-papers img:nth-child(1) { z-index: 1; }
