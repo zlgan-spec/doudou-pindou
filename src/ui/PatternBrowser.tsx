@@ -486,7 +486,6 @@ function Viewer({ item: card, prefer, actions, onClose, onStep }: { item: Browse
     return () => el.removeEventListener('keydown', onKey);
   }, []);
 
-  const size = sizeLabel(item.grid);
   return (
     <dialog
       ref={dialog}
@@ -517,22 +516,23 @@ function Viewer({ item: card, prefer, actions, onClose, onStep }: { item: Browse
             <svg viewBox="0 0 24 24" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
-        {(item.tags.length > 0 || size || card.sizes) && (
-          <p className="viewer-tags">
-            {card.sizes ? (
-              <span className="seg mini" role="radiogroup" aria-label="豆板尺寸">
-                {card.sizes.map(v => (
-                  <button key={v.id} role="radio" aria-checked={v.id === item.id} className={v.id === item.id ? 'on' : ''} onClick={() => setPicked(sizeLabel(v.grid))}>
-                    {sizeLabel(v.grid) ?? `${v.grid.width}×${v.grid.height}`}
-                  </button>
-                ))}
-              </span>
-            ) : size && <span>{size}</span>}
-            {item.tags.map(t => <span key={t}>{t}</span>)}
-          </p>
-        )}
         <dl className="viewer-facts">
-          <div><dt>豆板</dt><dd>{boardLabel(item.grid.width, item.grid.height)}</dd></div>
+          <div>
+            <dt>豆板</dt>
+            <dd>
+              {card.sizes ? (
+                // 几个尺寸：豆板这一行右边是一条滑块，点哪个尺寸白块滑过去
+                <span className="seg mini glide" role="radiogroup" aria-label="豆板尺寸"
+                  style={{ '--n': card.sizes.length, '--at': Math.max(0, card.sizes.findIndex(v => v.id === item.id)) } as CSSProperties}>
+                  {card.sizes.map(v => (
+                    <button key={v.id} role="radio" aria-checked={v.id === item.id} className={v.id === item.id ? 'on' : ''} onClick={() => setPicked(sizeLabel(v.grid))}>
+                      {sizeLabel(v.grid) ?? `${v.grid.width}×${v.grid.height}`}
+                    </button>
+                  ))}
+                </span>
+              ) : boardLabel(item.grid.width, item.grid.height)}
+            </dd>
+          </div>
           <div><dt>颜色</dt><dd>{legendOf(item.grid).length} 色</dd></div>
           <div><dt>豆子</dt><dd>{beadCount(item.grid).toLocaleString()} 颗</dd></div>
           {item.credit && <div><dt>出处</dt><dd>{item.credit}</dd></div>}

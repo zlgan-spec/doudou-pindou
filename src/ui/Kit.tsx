@@ -80,6 +80,7 @@ export default function Kit() {
           <div style={row}>
             <div className="seg" role="radiogroup"><button className="on">自适应</button><button>52×52</button><button>78×78</button></div>
             <div className="seg mini" role="radiogroup"><button className="on">贴纸</button><button>写实</button></div>
+            <div className="seg mini glide" role="radiogroup" style={{ '--n': 3, '--at': 2 } as CSSProperties}><button>52×52</button><button>78×78</button><button className="on">104×104</button></div>
           </div>
         </Block>
 

@@ -459,6 +459,11 @@ a { color: inherit; }
 .switch-row.static:hover { background: none; }
 .seg.mini { padding: 2px; }
 .seg.mini button { padding: 4px 12px; font-size: var(--text-s); }
+/* 滑块式分段（大图里切豆板尺寸）：每项等宽，白块跟着选中项滑过去；--n 是项数，--at 是选中第几项（从 0 数） */
+.seg.mini.glide { position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.seg.mini.glide::before { content: ''; position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px - (var(--n) - 1) * 2px) / var(--n)); border-radius: var(--radius-pill); background: var(--surface); box-shadow: var(--shadow-0); transform: translateX(calc(var(--at) * (100% + 2px))); transition: transform 0.25s var(--ease-out); }
+.seg.mini.glide button { position: relative; }
+.seg.mini.glide button.on { background: transparent; box-shadow: none; }
 .switch-row .ring-color { margin-left: auto; }
 /* 这两处的小圆点不是开关，不吃 .switch-row i 的开关样式 */
 .text-pop .switch-row .ring-color i { position: static; width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.12); transform: none; }
@@ -616,12 +621,11 @@ a { color: inherit; }
 .viewer-close { flex: none; width: 32px; height: 32px; border: 0; border-radius: var(--radius-pill); background: var(--fill); color: var(--ink); display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
 .viewer-close:hover { background: var(--line); }
 .viewer-close svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.viewer-tags { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.viewer-tags > span:not(.seg) { padding: 4px 10px; border-radius: var(--radius-pill); background: var(--fill); font-size: var(--text-s); color: var(--muted); }
 .viewer-facts { margin: 0; border-top: 1px solid var(--line); }
-.viewer-facts div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: var(--text-m); }
+.viewer-facts div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: var(--text-m); }
 .viewer-facts dt { flex: none; color: var(--muted); }
 .viewer-facts dd { margin: 0; text-align: right; }
+.viewer-facts .seg { margin: -6px 0; } /* 尺寸滑块比文字高，不把这一行撑得比别的行高 */
 .viewer-facts a { color: var(--ink); text-underline-offset: 3px; }
 .viewer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .viewer-actions .btn.primary { flex: 1 1 100%; padding: 12px; }
