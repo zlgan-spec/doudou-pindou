@@ -83,13 +83,13 @@ export interface SeriesGroup {
 /** 旧的系列页网址 #/patterns/s/<系列 id> 还能用：打开就是选中这个系列 */
 const seriesOfHash = () => /^#\/patterns\/s\/([a-z0-9-]+)/.exec(window.location.hash)?.[1] ?? null;
 
-/** 卡片：图纸库只放一张图（名字在悬停提示和大图里），打开文件夹时下面写名字（label）；我的收藏下面写名字 + 豆板 */
+/** 卡片：图纸库只放一张图（名字在悬停提示和大图里），打开文件夹时左下角贴一张写名字的小便签（label），不占高度；我的收藏下面写名字 + 豆板 */
 function Card({ item, i, bare, label, onOpen }: { item: BrowserItem; i: number; bare: boolean; label?: string; onOpen: (id: string) => void }) {
   return (
     <li style={{ '--i': Math.min(i, 40) } as CSSProperties}>
       <button onClick={() => onOpen(item.id)} aria-label={`查看 ${item.name}`} title={item.name}>
-        <span className="color-chip pattern-thumb"><img src={item.thumb} alt="" /></span>
-        {bare ? label && <span className="color-meta"><b>{label}</b></span> : (
+        <span className="color-chip pattern-thumb"><img src={item.thumb} alt="" />{bare && label && <b className="pattern-tag">{label}</b>}</span>
+        {!bare && (
           <span className="color-meta">
             <b>{item.name}</b>
             <small className="pattern-size">{sizeLabel(item.grid) ?? `${item.grid.width}×${item.grid.height}`}</small>
