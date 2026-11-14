@@ -96,7 +96,7 @@ export default function Kit() {
               <input placeholder="搜名字或系列" aria-label="搜索示例" />
             </label>
             <select className="size-pick" aria-label="下拉示例"><option>全部尺寸</option><option>52×52</option></select>
-            <select className="size-pick mini" aria-label="小号下拉示例"><option>像素</option><option>圆体</option></select>
+            <select className="size-pick mini" aria-label="小号下拉示例"><option>缝合像素字体</option><option>资源圆体</option></select>
           </div>
         </Block>
 
