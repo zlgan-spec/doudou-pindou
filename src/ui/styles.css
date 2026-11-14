@@ -582,9 +582,11 @@ a { color: inherit; }
 .folder-head small { font-size: var(--text-m); color: var(--muted); font-variant-numeric: tabular-nums; }
 .folder-subs { margin: -4px 0 14px; }
 .pattern-grid { grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 14px; }
-.pattern-grid .pattern-thumb { aspect-ratio: 1; padding: 7%; } /* 图纸库卡片只有图：方框、少留边，图尽量大 */
+.pattern-grid .pattern-thumb { aspect-ratio: 1; padding: 0; } /* 图纸库卡片只有图：方框，图直接铺满卡片里面 */
+.pattern-grid .pattern-thumb img { border-radius: var(--radius-s); } /* 和卡片的圆角同心（卡片 16 − 内边距 6） */
 /* 图纸卡片套色卡库的卡片（.color-grid / .color-chip / .color-meta），这里只改图那一块：底色、图居中 */
-.pattern-thumb { justify-content: center; align-items: center; padding: 8%; background: var(--card); box-shadow: var(--edge-inset); }
+.pattern-thumb { justify-content: center; align-items: center; padding: 8%; }
+.color-chip.pattern-thumb { box-shadow: none; } /* 图纸卡片只有外面卡片这一圈：图直接放进去，不再套一层灰底细框（色卡的 .color-chip 写在后面，这里要高一级才盖得住） */
 .pattern-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 /* 打开文件夹时的名字：图左下角伸出来一张小便签（贴着卡片左边、压在图的底边上），卡片不加高 */
 .pattern-thumb { position: relative; }
