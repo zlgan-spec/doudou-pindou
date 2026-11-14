@@ -17,7 +17,8 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 // 仅本地开发，不会被打包发布：
 // - 出图测试台读本机的测试图：默认 test-images/（不进仓库），可以用 DOUDOU_TEST_IMAGES 指到别的文件夹
-// - 设了 DOUDOU_LIBRARY（一份图纸库 json 的路径）就用它代替 public/patterns/index.json，方便预览还没上线的图纸
+// - 设了 DOUDOU_LIBRARY（一份图纸库 json 的路径）就用它代替 public/patterns/index.json，方便预览还没上线的图纸；
+//   原图（patterns/refs/<文件名>）也从那份 json 旁边的 refs/ 文件夹读
 function localDev(): Plugin {
   return {
     name: 'local-dev-files',
@@ -29,6 +30,18 @@ function localDev(): Plugin {
           readFile(path.resolve(library), (err, body) => {
             if (err) return next();
             res.setHeader('Content-Type', 'application/json');
+            res.end(body);
+          });
+        });
+        const types: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+        server.middlewares.use('/patterns/refs/', (req, res, next) => {
+          // 只认一个文件名（和网站读图纸库时的规则一样），带路径的不认
+          const name = decodeURIComponent((req.url ?? '').split('?')[0]).replace(/^\//, '');
+          const ext = /^[a-z0-9][a-z0-9-]{0,54}\.(png|jpe?g|webp)$/.exec(name)?.[1];
+          if (!ext) return next();
+          readFile(path.join(path.dirname(path.resolve(library)), 'refs', name), (err, body) => {
+            if (err) return next();
+            res.setHeader('Content-Type', types[ext]);
             res.end(body);
           });
         });
@@ -85,7 +98,7 @@ function securityHeaders(): Plugin {
 // 容器要求（见官方 Skill minitool-zip-builder）：资源全用相对路径；不能联网；不能有内联 <script>、type="module"、import/export，
 // 只能是经典脚本；JS 转译到 ES2017 / Chrome 61，CSS 也按 Chrome 61 降级；不能带 source map 和构建配置
 
-// 图纸库打进包里（容器禁 fetch）：从 public/patterns/index.json 只取作者 DouDou、出处 AI 原创的图纸，不带外链字段；
+// 图纸库打进包里（容器禁 fetch）：从 public/patterns/index.json 只取作者 DouDou、出处 AI 原创的图纸，不带外链和原图字段（包有大小上限，原图不进包）；
 // 系列只留还有图纸的。规则改了要同步 CONTRIBUTING.md
 const LIBRARY_ID = 'virtual:library-data';
 function libraryData(): Plugin {
@@ -99,7 +112,7 @@ function libraryData(): Plugin {
       };
       const patterns = src.patterns
         .filter(p => p.author === 'DouDou' && p.source === 'AI 原创')
-        .map(({ link: _link, ...p }) => { void _link; return p; });
+        .map(({ link: _link, ref: _ref, ...p }) => { void _link; void _ref; return p; });
       const used = new Set(patterns.map(p => p.series));
       const series = src.series.filter(s => used.has(s.id));
       return `export default ${JSON.stringify({ v: src.v, series, patterns })};`;

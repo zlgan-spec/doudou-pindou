@@ -62,6 +62,8 @@ export interface LibraryPattern {
   series: string | null;
   /** 这是哪一张图纸的另一个尺寸（那张的 id）。图纸库里不单独出卡片，在那张的大图里切换；不是就写 null */
   variantOf: string | null;
+  /** 原图文件名（在图纸库 index.json 同级的 refs/ 里），拿去改时编辑器里能开原图小窗对照；没有写 null。另一个尺寸没写就用主图的 */
+  ref: string | null;
 }
 
 export interface LibrarySeries {
@@ -107,6 +109,12 @@ function toBoard(grid: Grid): Grid | null {
 
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
+/** 原图文件名：只认 refs/ 里的一个文件名（小写字母、数字、短横线 + 图片后缀），带路径、网址的一律不认 */
+const REF = /^[a-z0-9][a-z0-9-]{0,54}\.(png|jpe?g|webp)$/;
+export const cleanRef = (v: unknown): string | undefined => (typeof v === 'string' && REF.test(v) ? v : undefined);
+/** 原图的地址：和图纸库 index.json 同级的 refs/ 文件夹 */
+export const refUrl = (name: string) => `${import.meta.env.BASE_URL}patterns/refs/${name}`;
+
 function decode(o: Record<string, unknown>): LibraryPattern | null {
   const id = text(o.id, 40);
   if (!ID.test(id)) return null;
@@ -140,6 +148,7 @@ function decode(o: Record<string, unknown>): LibraryPattern | null {
     grid,
     series: ID.test(text(o.series, 40)) ? text(o.series, 40) : null,
     variantOf: ID.test(text(o.variantOf, 40)) ? text(o.variantOf, 40) : null,
+    ref: cleanRef(o.ref) ?? null,
   };
 }
 
@@ -171,7 +180,10 @@ export function parseLibrary(data: unknown): Library {
   });
   // 另一个尺寸必须指向一张真的在库里、自己不是「另一个尺寸」的图纸，否则当成普通的一张
   const mains = new Set(patterns.filter(p => !p.variantOf).map(p => p.id));
-  return { patterns: patterns.map(p => (p.variantOf && !mains.has(p.variantOf) ? { ...p, variantOf: null } : p)), series };
+  const fixed = patterns.map(p => (p.variantOf && !mains.has(p.variantOf) ? { ...p, variantOf: null } : p));
+  // 另一个尺寸没写原图就用主图的（同一张画出的几个尺寸共用一张原图）
+  const refOf = new Map(fixed.filter(p => !p.variantOf).map(p => [p.id, p.ref]));
+  return { patterns: fixed.map(p => (p.variantOf && !p.ref ? { ...p, ref: refOf.get(p.variantOf) ?? null } : p)), series };
 }
 
 /** 同一张图的各个尺寸：主图加上指向它的那些，从小到大排。只有一个尺寸的不在返回里 */

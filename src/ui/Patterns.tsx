@@ -21,7 +21,7 @@ function toEntry(p: LibraryPattern): PatternEntry {
   const size = sizeOf(p.grid);
   return {
     id: '', name: p.name, size: size ?? 'small', style: 'sticker', fullBoard: !size, mirrored: p.mirrored, grid: p.grid,
-    thumb: '', tags: p.tags, libId: p.id, createdAt: 0, updatedAt: 0,
+    thumb: '', tags: p.tags, libId: p.id, ...(p.ref ? { ref: p.ref } : {}), createdAt: 0, updatedAt: 0,
   };
 }
 
@@ -121,7 +121,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
       return;
     }
     const e = toEntry(sized(p));
-    setNote(createPattern({ name: e.name, size: e.size, style: e.style, fullBoard: e.fullBoard, mirrored: e.mirrored, grid: e.grid, tags: e.tags, libId: e.libId }) ? '' : platform.copy.storageFull('收藏不进去'));
+    setNote(createPattern({ name: e.name, size: e.size, style: e.style, fullBoard: e.fullBoard, mirrored: e.mirrored, grid: e.grid, tags: e.tags, libId: e.libId, ...(e.ref ? { ref: e.ref } : {}) }) ? '' : platform.copy.storageFull('收藏不进去'));
   };
 
   return (

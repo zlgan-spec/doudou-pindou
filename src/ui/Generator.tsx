@@ -1,6 +1,6 @@
 // 豆图生成：先选豆板尺寸 → 传图自动生成 → 调背景 → 编辑 → 导出。
 // 第一次打开是尺寸 + 上传区；传图后是图纸和色号清单，移除背景在工具栏的开关里。换图用「导入」。
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { MAX_CUSTOM_SIDE, SIZES, boardFor, tierFor, type SizeId, type StyleId } from '../core/config';
 import { startHistory, type History } from '../core/edit';
 import { beadCount, contentBounds, legendOf, type Grid } from '../core/grid';
@@ -15,6 +15,7 @@ import { Editor, type Doc } from './Editor';
 import { UploadCard } from './Upload';
 import { DEFAULT_SIZING, SizePicker, modeLabel, type Sizing } from './SizePicker';
 import { readPattern } from './pngData';
+import { loadLibrary, refUrl } from './library';
 import { clearDraft, loadDraft, saveDraft, type Draft } from './draft';
 import { FileTooLargeError, isHeic, loadImage, MAX_FILE_BYTES } from './loadImage';
 import { askCrop } from './Cropper';
@@ -83,6 +84,23 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
   const [fullBoard, setFullBoard] = useState(opened?.fullBoard ?? false); // 保留背景的照片占满整块板，检查时不看安全边距
   // 原图对照：生成时记下原图的哪一块对应图纸的哪一块
   const [reference, setReference] = useState<Reference | null>(null);
+  // 图纸库的图纸（拿去改、收藏后再打开、接着改草稿）带着原图：原图整张对应打开时图纸里有豆子的那块
+  const [libRef, setLibRef] = useState<{ name: string; grid: Grid } | null>(() => (opened?.ref ? { name: opened.ref, grid: opened.grid } : null));
+  // 以前收藏的图纸库图纸没记原图：按图纸库 id 去图纸库里找（只用来显示，不改写收藏）
+  useEffect(() => {
+    if (!opened?.libId || opened.ref) return;
+    let live = true;
+    const req = requestId.current; // 查到之前已经换了图就不要了
+    loadLibrary().then(lib => {
+      const ref = lib.patterns.find(p => p.id === opened.libId)?.ref;
+      if (live && ref && req === requestId.current) setLibRef(r => r ?? { name: ref, grid: opened.grid });
+    }, () => {});
+    return () => { live = false; };
+  }, [opened]);
+  const libReference = useMemo((): Reference | null => {
+    const box = libRef && contentBounds(libRef.grid);
+    return libRef && box ? { url: refUrl(libRef.name), crop: { x: 0, y: 0, w: 1, h: 1 }, box } : null;
+  }, [libRef]);
   // 首页传来的图：先停在选尺寸这一步，选好再生成
   const [pending, setPending] = useState<File | null>(null);
   // 当前图纸在"我的收藏"里的 id：只有用户点了收藏才有；收藏后的编辑自动跟着存
@@ -117,7 +135,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     const doc = history.present;
     const save = () => {
       pendingDraft.current = null;
-      saveDraft({ name: docName.trim() || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid });
+      saveDraft({ name: docName.trim() || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, ...(libRef ? { ref: libRef.name } : {}) });
     };
     pendingDraft.current = save;
     const timer = window.setTimeout(save, 800);
@@ -125,7 +143,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       window.clearTimeout(timer);
       pendingDraft.current = null;
     };
-  }, [history, patternId, docName, style, fullBoard]);
+  }, [history, patternId, docName, style, fullBoard, libRef]);
   // 刷新、关页面、切到后台时，还没到点的那次保存马上存，刚改的一笔不丢
   useEffect(() => {
     const flush = () => {
@@ -150,6 +168,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     setDocName(d.name === '未命名' ? '' : d.name);
     setPatternId(null);
     setHistory(startHistory({ grid: d.grid, mirrored: d.mirrored }));
+    setLibRef(d.ref ? { name: d.ref, grid: d.grid } : null);
     setGenId(n => n + 1);
     setDraftOffer(null);
   };
@@ -351,6 +370,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       setFullBoard(saved.fullBoard);
       setDocName(saved.name);
       setPatternId(null);
+      setLibRef(null); // 拖回来的图纸 PNG 不带原图
       setHistory(startHistory({ grid: saved.grid, mirrored: saved.mirrored }));
       setGenId(n => n + 1);
       setBusy(false);
@@ -419,6 +439,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     if (edited && !patternId && !window.confirm('换图会丢掉当前图纸的修改，继续吗？')) return;
     requestId.current++;
     setSource(null);
+    setLibRef(null);
     setHistory(null);
     setStatus('');
     setError('');
@@ -452,7 +473,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
   const addToStore = (nameNow: string) => {
     if (!history) return;
     const doc = history.present;
-    const id = createPattern({ name: nameNow || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, tags: opened?.tags, libId: opened?.libId });
+    const id = createPattern({ name: nameNow || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, tags: opened?.tags, libId: opened?.libId, ...(libRef ? { ref: libRef.name } : {}) });
     if (!id) setError(platform.copy.storageFull('收藏不进去'));
     setPatternId(id);
   };
@@ -524,7 +545,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
             onSave={() => {
               const { file, draft: d } = draftAsk;
               setDraftAsk(null);
-              if (!createPattern({ name: d.name, size: d.size, style: d.style, fullBoard: d.fullBoard, mirrored: d.mirrored, grid: d.grid })) {
+              if (!createPattern({ name: d.name, size: d.size, style: d.style, fullBoard: d.fullBoard, mirrored: d.mirrored, grid: d.grid, ...(d.ref ? { ref: d.ref } : {}) })) {
                 setError(platform.copy.storageFull('草稿没收藏进去'));
                 return;
               }
@@ -559,7 +580,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
               fullBoard={fullBoard}
               starred={!!patternId || showLibStarred}
               onImport={pick}
-              reference={source ? reference : null}
+              reference={source ? reference : libReference}
               active={active}
               removeBg={source ? removeBg : undefined}
               onToggleRemoveBg={() => setRemoveBg(v => !v)}

@@ -50,6 +50,21 @@ describe('系列', () => {
     expect(nameInSeries('布偶猫 · 坐', '散装')).toBe('布偶猫 · 坐');
   });
 
+  it('原图只认 refs/ 里的一个文件名；另一个尺寸没写就用主图的，写了用自己的', () => {
+    const lib = parseLibrary({ patterns: [
+      { ...pattern('cat'), ref: 'cat-orig.png' },
+      { ...pattern('cat-big'), rows: ['000', '000', '000'], variantOf: 'cat' },
+      { ...pattern('cat-mid'), rows: ['000', '000', '000'], variantOf: 'cat', ref: 'cat-mid.webp' },
+      ...['../x.png', '/etc/x.png', 'https://a.b/x.png', 'refs/x.png', 'X.PNG', 'x.svg', 'x.png?a=1'].map((ref, i) => ({ ...pattern(`bad-${i}`), ref })),
+      pattern('none'),
+    ] });
+    expect(lib.patterns.map(p => [p.id, p.ref])).toEqual([
+      ['cat', 'cat-orig.png'], ['cat-big', 'cat-orig.png'], ['cat-mid', 'cat-mid.webp'],
+      ...[0, 1, 2, 3, 4, 5, 6].map(i => [`bad-${i}`, null]),
+      ['none', null],
+    ]);
+  });
+
   it('没有系列清单的旧文件照样能读', () => {
     const lib = parseLibrary({ v: 1, patterns: [pattern('a')] });
     expect(lib.series).toEqual([]);
