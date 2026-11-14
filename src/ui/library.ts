@@ -197,10 +197,13 @@ export function groupSeries(lib: Library): { groups: Array<{ series: LibrarySeri
 
 let cache: Promise<Library> | null = null;
 
-/** 读图纸库；读不到返回空的 */
-export function loadLibrary(): Promise<Library> {
-  cache ??= platform.loadLibraryData()
-    .then(parseLibrary)
-    .catch(() => ({ patterns: [], series: [] }));
-  return cache;
+/** 读图纸库；读不到（断网、文件没了）就报错，下次调用重新读。retry：不等还没读完的那次，重新读一遍（网慢卡住时点「重试」） */
+export function loadLibrary(retry = false): Promise<Library> {
+  if (retry) cache = null;
+  const p = (cache ??= platform.loadLibraryData().then(data => {
+    if (data == null) throw new Error('图纸库读不到');
+    return parseLibrary(data);
+  }));
+  p.catch(() => { if (cache === p) cache = null; });
+  return p;
 }

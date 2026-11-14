@@ -142,6 +142,16 @@ export default function Kit() {
           </div>
         </Block>
 
+        <Block title="加载中（全站同一个转圈，外面加 .busy）">
+          <div style={{ ...row, alignItems: 'flex-start' }}>
+            <p className="status busy">正在读取图纸库…</p>
+            <button className="btn primary pill busy" disabled>正在下载…</button>
+            <div className="toast notice busy show" style={still}>正在生成图纸…</div>
+            <div className="toast notice has-action busy show" style={still}><span>正在加载抠图模型…</span><button>先不抠图</button></div>
+          </div>
+          <div className="empty busy" style={{ minHeight: 120, marginTop: 16 }}><p>正在生成图纸…</p></div>
+        </Block>
+
         <Block title="对话框">
           <div className="ask" style={still}>
             <h2>换一张图？</h2>

@@ -4,7 +4,7 @@ import { platform } from '@platform';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NoteToast } from './NoteToast';
-import { downloadSheet, PatternBrowser, type BrowserItem } from './PatternBrowser';
+import { downloadSheet, PatternBrowser, SheetExportButton, type BrowserItem } from './PatternBrowser';
 import { dateStamp } from './pngData';
 import { deletePattern, exportPatterns, importPatterns, listPatterns, subscribe, type PatternEntry } from './store';
 
@@ -77,7 +77,7 @@ export function Mine({ onOpen }: Props) {
             if (!e) return null;
             return (
               <>
-                <button className="btn primary pill" onClick={() => downloadSheet(e)}>{platform.copy.sheetExportLabel}</button>
+                <SheetExportButton onExport={() => downloadSheet(e)} />
                 <button className="btn pill" onClick={() => { close(); onOpen(e); }}>接着改</button>
                 <button className="btn link" onClick={() => unstar(e, close)}>取消收藏</button>
               </>

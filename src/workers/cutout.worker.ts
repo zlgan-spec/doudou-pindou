@@ -82,7 +82,8 @@ async function computeMask(req: CutoutRequest): Promise<Float32Array> {
 self.addEventListener('message', async (event: MessageEvent<CutoutRequest>) => {
   const req = event.data;
   try {
-    self.postMessage({ id: req.id, type: 'progress', phase: 'loading' });
+    // 模型还没加载过才说「正在加载」（加载好的直接算，不再闪「首次使用」那句）
+    if (!sessionPromise) self.postMessage({ id: req.id, type: 'progress', phase: 'loading' });
     const mask = await computeMask(req);
     self.postMessage({ id: req.id, type: 'result', mask: mask.buffer }, { transfer: [mask.buffer] });
   } catch (error) {

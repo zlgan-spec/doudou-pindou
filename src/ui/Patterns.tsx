@@ -1,12 +1,12 @@
 // 图纸库（整理好的现成图纸，public/patterns/index.json）和我的收藏（收藏过的图纸）：顶部导航里各占一个按钮，页面没有页头，打开就是搜索和图纸。
 import { platform } from '@platform';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SIZES } from '../core/config';
 import { contentBounds, type Grid } from '../core/grid';
 import { categoryRank, groupSeries, loadLibrary, sizeOf, sizeVariants, type Library as LibraryData, type LibraryPattern } from './library';
 import { Mine } from './Mine';
 import { NoteToast } from './NoteToast';
-import { downloadSheet, PatternBrowser, type BrowserItem, type SeriesGroup } from './PatternBrowser';
+import { downloadSheet, PatternBrowser, SheetExportButton, type BrowserItem, type SeriesGroup } from './PatternBrowser';
 import { createPattern, deletePattern, listPatterns, makeThumb, subscribe, type PatternEntry } from './store';
 
 export type LibraryTab = 'library' | 'mine';
@@ -32,10 +32,23 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
   const [note, setNote] = useState('');
   const clearNote = useCallback(() => setNote(''), []);
 
-  useEffect(() => {
-    void loadLibrary().then(setLib);
-    return subscribe(() => setStarred(listPatterns()));
+  // 读图纸库（网站版要下载，小工具版在包里）：读了 10 秒还没好、或者读失败了，给一个「重试」
+  const [wait, setWait] = useState<'loading' | 'slow' | 'failed'>('loading');
+  const attempt = useRef(0);
+  const load = useCallback((retry: boolean) => {
+    const n = ++attempt.current;
+    setWait('loading');
+    const slow = window.setTimeout(() => { if (n === attempt.current) setWait('slow'); }, 10000);
+    loadLibrary(retry).then(l => { window.clearTimeout(slow); setLib(l); }, () => {
+      window.clearTimeout(slow);
+      if (n === attempt.current) setWait('failed');
+    });
   }, []);
+
+  useEffect(() => {
+    load(false);
+    return subscribe(() => setStarred(listPatterns()));
+  }, [load]);
 
   // 同一张图有几个尺寸时只出一张卡片：主图带上各个尺寸，在大图里切换
   const items = useMemo((): BrowserItem[] => {
@@ -88,7 +101,11 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
     return { series: seriesGroups, blocks: all };
   }, [lib, items]);
 
-  if (!patterns) return <p className="status busy">正在读取图纸库…</p>;
+  if (!patterns) {
+    const again = <button className="btn link small" onClick={() => load(true)}>重试</button>;
+    if (wait === 'failed') return <p className="status">图纸库没读出来 {again}</p>;
+    return <p className="status busy">{wait === 'slow' ? <>正在读取图纸库，网有点慢 {again}</> : '正在读取图纸库…'}</p>;
+  }
   if (!patterns.length) {
     return (
       <div className="empty tall">
@@ -120,7 +137,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
           const isStarred = starred.some(e => e.libId === p.id);
           return (
             <>
-              <button className="btn primary pill" onClick={() => downloadSheet({ ...sized(p), size: sizeOf(p.grid) ?? undefined })}>{platform.copy.sheetExportLabel}</button>
+              <SheetExportButton onExport={() => downloadSheet({ ...sized(p), size: sizeOf(p.grid) ?? undefined })} />
               <button className="btn pill" aria-pressed={isStarred} onClick={() => toggleStar(p)}>{isStarred ? '已收藏' : '收藏'}</button>
               <button className="btn link" onClick={() => { close(); onOpen(toEntry(sized(p)), 'library'); }}>拿去改</button>
             </>

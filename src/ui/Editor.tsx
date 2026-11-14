@@ -1162,7 +1162,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const save = () => {
     if (exporting) return;
     setExporting(true);
-    void platform.exportSheet({ title: name.trim() || '未命名豆图', fileName: sheetFileName(name, doc.mirrored), build: buildImages }).finally(() => setExporting(false));
+    void platform.exportSheet({ title: name.trim() || '未命名豆图', fileName: sheetFileName(name, doc.mirrored), build: buildImages }).then(() => setExporting(false), () => setExporting(false)); // 不用 finally：Chrome 61（小工具老安卓）没有
   };
 
   // 原图对照：半透明叠在图纸上，只在屏幕上看，不进导出
@@ -1488,7 +1488,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   return (
     <section className={`result ${collapsed ? 'list-collapsed' : ''}`}>
       {active && (
-        <div className={`toast has-action ${handoff || growNote || notice ? 'show' : ''} ${!handoff && !growNote && notice ? 'notice' : ''}`} role="status" aria-live="polite">
+        <div className={`toast has-action ${handoff || growNote || notice ? 'show' : ''} ${!handoff && !growNote && notice ? 'notice' : ''} ${!handoff && !growNote && notice && busy ? 'busy' : ''}`} role="status" aria-live="polite">
           {handoff && <><span>画笔已换成刚选的 <b>{handoff.code}</b>，直接画吧</span><button onClick={undoHandoff}>不用</button></>}
           {!handoff && growNote && <span>{growNote}</span>}
           {!handoff && !growNote && notice}
@@ -1549,7 +1549,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
             </div>
           )}
           {onImport && <button className="btn soft pill btn-icon" onClick={onImport} title="换一张图，或导入存过的图纸 PNG" data-guide="file">{ICON.import}导入</button>}
-          <button className="btn primary pill btn-icon" onClick={save} disabled={exporting} title={platform.copy.exportTitle} data-guide="file">{ICON.export}{exporting ? platform.copy.exportingLabel : platform.copy.exportLabel}</button>
+          <button className={`btn primary pill btn-icon ${exporting ? 'busy' : ''}`} onClick={save} disabled={exporting} title={platform.copy.exportTitle} data-guide="file">{ICON.export}{exporting ? platform.copy.exportingLabel : platform.copy.exportLabel}</button>
           {/* 重看新手引导：和深浅色切换同一个圆形按钮 */}
           <button className="theme-toggle" onClick={() => setGuideRun(n => n + 1)} aria-label="使用引导" title="使用引导">{ICON.help}</button>
         </>,

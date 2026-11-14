@@ -43,8 +43,8 @@ function sizeLabel(grid: Grid): string | null {
 }
 
 /** 保存整张图纸（网站版下载、小工具版存相册），PNG 里带着格子表格，拿回做豆图能接着改 */
-export function downloadSheet(p: { name: string; grid: Grid; mirrored: boolean; size?: SizeId; style?: StyleId; fullBoard?: boolean }) {
-  void platform.exportSheet({
+export function downloadSheet(p: { name: string; grid: Grid; mirrored: boolean; size?: SizeId; style?: StyleId; fullBoard?: boolean }): Promise<void> {
+  return platform.exportSheet({
     title: p.name,
     fileName: sheetFileName(p.name, p.mirrored),
     build: codes => [{
@@ -55,6 +55,22 @@ export function downloadSheet(p: { name: string; grid: Grid; mirrored: boolean; 
       ),
     }],
   });
+}
+
+/** 大图旁的「下载图纸 / 存相册」按钮：网站版画图要一两秒，这期间转圈、点不了，免得连点下好几份 */
+export function SheetExportButton({ onExport }: { onExport: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const run = () => {
+    if (busy) return;
+    setBusy(true);
+    const done = () => setBusy(false);
+    onExport().then(done, done); // 不用 finally：Chrome 61（小工具老安卓）没有
+  };
+  return (
+    <button className={`btn primary pill ${busy ? 'busy' : ''}`} onClick={run} disabled={busy}>
+      {busy ? platform.copy.exportingLabel : platform.copy.sheetExportLabel}
+    </button>
+  );
 }
 
 /** 图纸库的一个系列，我的收藏没有 */

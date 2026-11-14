@@ -16,9 +16,11 @@ export function ExportHost() {
   const [req, setReq] = useState<ExportRequest | null>(null);
   const [images, setImages] = useState<ExportImage[] | null>(null);
   const [saving, setSaving] = useState(false);
+  // 点了「存相册」15 秒平台还没回话：按钮恢复，让用户能再点一次
+  const [stuck, setStuck] = useState(false);
 
   useEffect(() => {
-    open = r => { setReq(r); setImages(null); };
+    open = r => { setReq(r); setImages(null); setStuck(false); };
     return () => { open = null; };
   }, []);
 
@@ -43,21 +45,24 @@ export function ExportHost() {
   const save = () => {
     if (!images || saving) return;
     setSaving(true);
+    setStuck(false);
+    const late = window.setTimeout(() => { setSaving(false); setStuck(true); }, 15000);
     // 同步调用：第一张图的平台接口在这次点击里就发出
-    void saveDataUrls(images.map(i => i.url)).then(n => { setSaving(false); if (n) close(); });
+    void saveDataUrls(images.map(i => i.url)).then(n => { window.clearTimeout(late); setSaving(false); setStuck(false); if (n) close(); });
   };
 
   return (
     <dialog ref={dialog} className="ask export-sheet" onClose={close} onClick={e => { if (e.target === dialog.current) close(); }} aria-labelledby="export-title">
       <h2 id="export-title">存到相册</h2>
       <div className="export-preview">
-        {images ? <img src={images[0].url} alt={req?.title ?? '图纸预览'} /> : <span className="fine">正在生成…</span>}
+        {images ? <img src={images[0].url} alt={req?.title ?? '图纸预览'} /> : <p className="status busy">正在生成…</p>}
       </div>
       {images && images.length > 1 && <p className="fine">共 {images.length} 张：总览 + 每块板一张</p>}
       {!albumAvailable() && <p className="fine">在小红书 App 里打开才能存相册</p>}
+      {stuck && <p className="fine">相册没有回应，可以再点一次试试</p>}
       <div className="ask-actions">
         <button className="btn link" onClick={close}>取消</button>
-        <button className="btn primary pill" onClick={save} disabled={!images || saving}>{saving ? '正在保存…' : '存相册'}</button>
+        <button className={`btn primary pill ${saving ? 'busy' : ''}`} onClick={save} disabled={!images || saving}>{saving ? '正在保存…' : '存相册'}</button>
       </div>
     </dialog>
   );

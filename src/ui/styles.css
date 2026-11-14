@@ -228,7 +228,18 @@ a { color: inherit; }
 
 .status { margin: 0; font-size: var(--text-m); color: var(--muted); line-height: 1.6; }
 .status a { color: var(--ink); text-underline-offset: 3px; }
-.status.busy::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; border: 2px solid var(--ink); border-right-color: transparent; animation: spin 0.8s linear infinite; vertical-align: -1px; }
+/* 加载图标：全站只有这一个转圈的环，颜色跟着文字、大小跟着字号。要等的地方给外面加 .busy 就出现：
+   读取中的一句话（.status）、上传卡片、做豆图空白区、底部提示条、按钮。开了「减少动态效果」不转，改成慢慢一明一暗 */
+.status.busy::before, .drop.card.busy .drop-body strong::before, .empty.busy p::before, .toast.busy::before, .btn.busy::before {
+  content: ''; display: inline-block; flex: none; box-sizing: border-box; width: 0.9em; height: 0.9em; margin-right: 8px;
+  border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.8s linear infinite; vertical-align: -0.1em;
+}
+.btn.busy::before { margin-right: 0; } /* 按钮自己有 gap */
+.btn.busy:disabled { opacity: 1; cursor: progress; } /* 等着的按钮不变灰，看得出在干活 */
+.btn-icon.busy svg { display: none; } /* 转圈替掉按钮上的图标 */
+.status.boot { display: flex; justify-content: center; padding: 120px 0; font-size: var(--title-m); } /* 打开网页、脚本还没到时（index.html） */
+.status.boot::before { margin-right: 0; }
+@keyframes busy-pulse { 50% { opacity: 0.3; } }
 .error { margin: 12px 0 0; font-size: var(--text-m); color: var(--danger); line-height: 1.6; }
 
 /* ---------- 首页 ---------- */
@@ -285,7 +296,6 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) { .cta-reveal { stroke-dashoffset: 0; animation: none; } }
 .drop-body .logo { margin-bottom: -4px; }
 .drop-body strong { font-size: var(--title-s); font-weight: 500; letter-spacing: -0.01em; }
-.drop.card.busy .drop-body strong::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 10px; border-radius: 50%; border: 2px solid var(--ink); border-right-color: transparent; animation: spin 0.8s linear infinite; vertical-align: -1px; }
 
 /* ---------- 做拼豆：左选项 | 中图纸 | 右色号清单 ---------- */
 .page-head { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 24px; }
@@ -841,6 +851,9 @@ a { color: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status.busy::before, .drop.card.busy .drop-body strong::before, .empty.busy p::before, .toast.busy::before, .btn.busy::before { animation: busy-pulse 1.6s ease-in-out infinite !important; }
 }
 
 /* 出错兜底页 */

@@ -75,6 +75,8 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     return () => window.clearTimeout(t);
   }, [status, fitHint]);
   const [busy, setBusy] = useState(false);
+  // 抠图等了 20 秒还没好（多半是第一次下载模型、网慢）：提示条里给一个「先不抠图」
+  const [slowCut, setSlowCut] = useState(false);
   const cut = useRef<{ for: RgbaImage; result: CutoutResult } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [genId, setGenId] = useState(0); // 每次重新生成，编辑器的工具状态重置
@@ -206,6 +208,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     const id = ++requestId.current;
     setBusy(true);
     setError('');
+    setSlowCut(false);
     try {
       // 自定义：图案放进宽 × 高；自适应的像素画按 1:1（最大到自定义上限）；其余按选的豆板
       const pa = src.pixelArt;
@@ -229,8 +232,15 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       if (bg) {
         if (cut.current?.for !== image) {
           setProgress('正在识别主体…');
-          const result = await cutout(image, () => setProgress(platform.copy.cutoutLoading), { allowModel: !!platform.cutoutModel && !pixelArt });
+          const slow = window.setTimeout(() => { if (id === requestId.current) setSlowCut(true); }, 20000);
+          let result: CutoutResult;
+          try {
+            result = await cutout(image, () => setProgress(platform.copy.cutoutLoading), { allowModel: !!platform.cutoutModel && !pixelArt });
+          } finally {
+            window.clearTimeout(slow);
+          }
           if (id !== requestId.current) return;
+          setSlowCut(false);
           cut.current = { for: image, result };
         }
         mask = cut.current.result.mask;
@@ -554,7 +564,13 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
               removeBg={source ? removeBg : undefined}
               onToggleRemoveBg={() => setRemoveBg(v => !v)}
               busy={busy}
-              notice={busy ? progress : error ? error : fitHint && source ? (
+              notice={busy ? progress && (
+                <>
+                  <span>{progress}</span>
+                  {/* 关掉抠图就按原图重新生成，这次没抠完的不要了；模型在后台接着下，下次就快了 */}
+                  {slowCut && <button onClick={() => setRemoveBg(false)}>先不抠图</button>}
+                </>
+              ) : error ? error : fitHint && source ? (
                 <>
                   这张像素画是 {fitHint.cols}×{fitHint.rows}，比{sizing.mode === 'custom' ? `自定义的 ${sizing.w}×${sizing.h}` : ` ${modeLabel(sizing.mode)} `}大，已缩小转换
                   {fitHint.need && <button onClick={() => setSizing(v => ({ ...v, mode: fitHint.need! }))}>换成 {SIZES[fitHint.need].label}</button>}
@@ -567,7 +583,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
               onRename={rename}
             />
           ) : (
-            <div className="empty"><p>{busy ? progress : ' '}</p></div>
+            <div className={`empty ${busy ? 'busy' : ''}`}><p>{busy ? progress : ' '}</p></div>
           )}
         </main>
       </div>

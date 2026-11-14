@@ -8,7 +8,8 @@
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- 脚本还没下完时先转圈（只靠样式表，不用脚本）；页面画出来时 React 会把它换掉 -->
+    <div id="root"><p class="status busy boot" role="status" aria-label="正在打开"></p></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
