@@ -393,9 +393,10 @@ function SheetStage({ item }: { item: BrowserItem }) {
  */
 function Viewer({ item: card, prefer, actions, onClose, onStep }: { item: BrowserItem; prefer?: string; actions: Props['actions']; onClose: () => void; onStep?: (d: 1 | -1) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  // 同一张图有几个尺寸：默认看卡片上的那个（正按尺寸筛选时看筛的那个），在信息栏里切换。换一张图就回到默认
-  const [picked, setPicked] = useState<{ card: string; id: string } | null>(null);
-  const item = card.sizes?.find(v => v.id === (picked?.card === card.id ? picked.id : null))
+  // 同一张图有几个尺寸：默认看卡片上的那个（正按尺寸筛选时看筛的那个），在信息栏里切换。
+  // 选过的尺寸翻页时一直沿用（选了 78 就一直看 78）；下一张没有这个尺寸就看它的默认；关掉大图后回到默认
+  const [picked, setPicked] = useState<string | null>(null);
+  const item = card.sizes?.find(v => picked && sizeLabel(v.grid) === picked)
     ?? card.sizes?.find(v => prefer && sizeLabel(v.grid) === prefer)
     ?? card;
 
@@ -477,7 +478,7 @@ function Viewer({ item: card, prefer, actions, onClose, onStep }: { item: Browse
             {card.sizes ? (
               <span className="seg mini" role="radiogroup" aria-label="豆板尺寸">
                 {card.sizes.map(v => (
-                  <button key={v.id} role="radio" aria-checked={v.id === item.id} className={v.id === item.id ? 'on' : ''} onClick={() => setPicked({ card: card.id, id: v.id })}>
+                  <button key={v.id} role="radio" aria-checked={v.id === item.id} className={v.id === item.id ? 'on' : ''} onClick={() => setPicked(sizeLabel(v.grid))}>
                     {sizeLabel(v.grid) ?? `${v.grid.width}×${v.grid.height}`}
                   </button>
                 ))}
