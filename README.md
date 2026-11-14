@@ -61,6 +61,6 @@ npm test
 
 ## 致谢与许可证
 
-色号整理自公开的 MARD 色卡（MARD 是其权利人的商标，本项目与其没有官方关联）；抠图模型 U²-Netp（Apache-2.0）；像素字体 Fusion Pixel Font（OFL-1.1）。详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+色号整理自公开的 MARD 色卡（MARD 是其权利人的商标，本项目与其没有官方关联）；抠图模型 U²-Netp（Apache-2.0）；文字工具的字体 Fusion Pixel、Resource Han Rounded、站酷庆科黄油体、得意黑（均为 OFL-1.1）。详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 代码采用 [MIT](LICENSE) 许可证。

@@ -63,6 +63,6 @@ npm test
 
 ## Credits and license
 
-Color codes compiled from the public MARD color chart (MARD is a trademark of its owner; this project is not affiliated with MARD). Background removal model U²-Netp (Apache-2.0). Pixel font Fusion Pixel Font (OFL-1.1). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Color codes compiled from the public MARD color chart (MARD is a trademark of its owner; this project is not affiliated with MARD). Background removal model U²-Netp (Apache-2.0). Text tool fonts Fusion Pixel, Resource Han Rounded, ZCOOL QingKe HuangYou and Smiley Sans (all OFL-1.1). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Code released under the [MIT](LICENSE) license.
