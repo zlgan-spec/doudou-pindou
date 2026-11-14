@@ -4,6 +4,7 @@ import type { Grid } from '../../core/grid';
 import type { RgbaImage } from '../../core/image';
 import { generatePattern, generateRich, type PatternInput, type PatternOptions } from '../../core/pipeline';
 import type { ExportImage, Platform } from '../types';
+import { arrowTabs } from './arrowTabs';
 import { copy } from './copy';
 import { makeZip } from './zip';
 
@@ -109,6 +110,7 @@ export const platform: Platform = {
     exit: () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); },
   },
   copyText: text => navigator.clipboard.writeText(text),
+  arrowTabs,
   copy,
   boot: () => Promise.resolve(), // 主题防闪烁由 vite.config.ts 注入的内联脚本在渲染前做
   storage,

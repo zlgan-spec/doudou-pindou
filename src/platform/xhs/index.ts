@@ -29,9 +29,10 @@ export const platform: Platform = {
     externalLinks: false,
     backup: false,
   },
-  // 全屏由小红书容器管；剪贴板容器不开放
+  // 全屏由小红书容器管；剪贴板容器不开放；手机没有键盘
   fullscreen: null,
   copyText: null,
+  arrowTabs: null,
   copy,
   async boot() {
     // initSpread 要在 initStorage 之后（读「提过关注没有」）；它只查版本，不等网络

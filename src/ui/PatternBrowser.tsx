@@ -103,6 +103,7 @@ function Card({ item, i, bare, label, onOpen }: { item: BrowserItem; i: number; 
 export function PatternBrowser({ items, actions, series = [], blocks: allBlocks }: Props) {
   const catsRef = useRef<HTMLDivElement>(null);
   const subsRef = useRef<HTMLDivElement>(null);
+  const folderSubsRef = useRef<HTMLDivElement>(null);
   const library = series.length > 0;
   const [query, setQuery] = useState('');
   const seriesOf = useMemo(() => new Map(series.flatMap(s => s.items.map(i => [i.id, s.name] as const))), [series]);
@@ -166,6 +167,11 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
   }), [ordered, openFolder, q, cat, subOn, size, seriesOf]);
   const blocks = useMemo(() => [list], [list]);
 
+  // 网站版：← → 切上面那排大类；打开了文件夹就切文件夹里的细分（没有细分不动，不合上文件夹）
+  const arrowRow = useRef(() => null as HTMLElement | null);
+  arrowRow.current = () => (openFolder && !q ? folderSubsRef.current : catsRef.current);
+  useEffect(() => platform.arrowTabs?.(() => arrowRow.current()), []);
+
   // 大图里翻页的顺序 = 页面上从左到右、从上到下的顺序；首尾相接
   const order = useMemo(() => blocks.flat(), [blocks]);
   const step = (d: 1 | -1) => {
@@ -223,7 +229,7 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
         </div>
       )}
       {folderSubs.length > 0 && (
-        <div className="chips sub folder-subs" role="tablist" aria-label="标签">
+        <div className="chips sub folder-subs" ref={folderSubsRef} role="tablist" aria-label="标签">
           <button role="tab" aria-selected={!subOn} className={!subOn ? 'on' : ''} onClick={() => setSub(null)}>{ALL}<small>{openFolder?.items.length}</small></button>
           {folderSubs.map(c => (
             <button key={c.name} role="tab" aria-selected={subOn === c.name} className={subOn === c.name ? 'on' : ''} onClick={() => setSub(c.name)}>

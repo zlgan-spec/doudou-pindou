@@ -105,6 +105,8 @@ export interface Platform {
   fullscreen: { enter(): void; exit(): void } | null;
   /** 写剪贴板（色卡库点一下复制色号）；没有的渠道是 null，点了只选中 */
   copyText: ((text: string) => Promise<void>) | null;
+  /** 整页按 ← / → 切换 getList 给出的那排标签（role="tab"），返回取消监听；没有键盘的渠道是 null */
+  arrowTabs: ((getList: () => HTMLElement | null) => () => void) | null;
   /** 抠图模型：返回和图片同尺寸的 0–1 遮罩；没有模型的渠道是 null */
   cutoutModel: ((image: RgbaImage, onLoading: () => void) => Promise<Float32Array>) | null;
   /** 先把出图的后台线程起好（做豆图页一打开就调） */

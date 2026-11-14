@@ -1,5 +1,5 @@
 // 色卡库：MARD 221 色全部色号。按系列看、搜色号或 Hex 色值，点一下选中色号，回到做豆图画笔就用它。
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollBar } from './ScrollBar';
 import { platform } from '@platform';
 import { rgbToLab, textColorOn } from '../core/color';
@@ -47,6 +47,7 @@ export function Colors() {
   const [toast, setToast] = useState<string | null>(null);
   const [openQ, setOpenQ] = useState<string | null>(null); // 常见问题里展开的那一条
   const toastTimer = useRef<number>(0);
+  useEffect(() => platform.arrowTabs?.(() => chipsRef.current), []); // 网站版：← → 切系列
 
   // A10、B12、F10 这种既像色号又像 3 位 Hex 的，色号优先；带 # 才一定当 Hex
   const codeHit = !query.trim().startsWith('#') && PALETTE.some(c => c.code.startsWith(query.trim().toUpperCase()));
