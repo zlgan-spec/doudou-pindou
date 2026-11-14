@@ -89,6 +89,13 @@ export default function Kit() {
           <div className="chips sub"><button className="on">猫咪<small>40</small></button><button>杯垫<small>12</small></button></div>
         </Block>
 
+        <Block title="文字小窗的字体（复用筛选标签）">
+          <div className="adjust-pop text-pop" style={{ position: 'static', animation: 'none' }}>
+            <div className="switch-row static"><span><b>字体</b></span></div>
+            <div className="chips font-pick" role="radiogroup"><button className="on">像素</button><button>小像素</button><button>圆体</button><button>黄油体</button><button>得意黑</button></div>
+          </div>
+        </Block>
+
         <Block title="搜索框和下拉">
           <div className="search-row" style={{ maxWidth: 560 }}>
             <label className="search">

@@ -1,7 +1,10 @@
 // 小红书小工具版的文案：不放任何外链和个人联系方式，有问题在小工具挂载的笔记下留言。
 // 用户协议写给普通用户看，短句、不堆法律腔；不构成法律意见。改了内容就同时改 updated 日期。
 import type { Copy } from '../types';
-import OFL from '../../licenses/fusion-pixel-OFL.txt?raw';
+import OFL_FUSION from '../../licenses/fusion-pixel-OFL.txt?raw';
+import OFL_ROUNDED from '../../licenses/resource-han-rounded-OFL.txt?raw';
+import OFL_HUANGYOU from '../../licenses/zcool-qingke-huangyou-OFL.txt?raw';
+import OFL_SMILEY from '../../licenses/smiley-sans-OFL.txt?raw';
 
 export const copy: Copy = {
   storageFull: what => `存储空间满了，${what}。到「我的收藏」删掉几张再试。`,
@@ -21,7 +24,7 @@ export const copy: Copy = {
   cutoutLoading: '',
   terms: {
     version: '2026-11-04',
-    updated: '2026-11-04',
+    updated: '2026-11-14',
     intro: '欢迎使用 DouDou。DouDou 是一个免费的拼豆图纸小工具，由个人开发者维护（以下简称“我们”），提供图片转拼豆图纸、在线编辑图纸、现成图纸库和 MARD 色卡查询等功能。',
     readFirst: '请在使用前阅读本协议，特别是第 2 至 4 节关于图片和作品版权的说明。如有疑问，可以在小工具所在的笔记下留言。',
     sections: [
@@ -65,9 +68,9 @@ export const copy: Copy = {
       {
         title: '06 · 开源许可与商标',
         body: [
-          '用到的第三方组件和字体按各自的协议使用：界面框架 React（MIT 协议，Copyright (c) Meta Platforms, Inc. and affiliates）；像素字体 Fusion Pixel Font（SIL Open Font License 1.1，全文见下）。',
+          '用到的第三方组件和字体按各自的协议使用：界面框架 React（MIT 协议，Copyright (c) Meta Platforms, Inc. and affiliates）；文字工具的字体 Fusion Pixel Font、Resource Han Rounded、站酷庆科黄油体、得意黑（都是 SIL Open Font License 1.1，全文见下）。',
           'MARD 是其权利人的商标。DouDou 是独立开发的工具，与 MARD 没有官方关联。',
-          <details className="license"><summary>Fusion Pixel Font 许可全文</summary><pre>{OFL}</pre></details>,
+          <details className="license"><summary>字体许可全文</summary><pre>{[OFL_FUSION, OFL_ROUNDED, OFL_HUANGYOU, OFL_SMILEY].join('\n\n')}</pre></details>,
         ],
       },
       {
@@ -86,6 +89,6 @@ export const copy: Copy = {
       },
     ],
   },
-  footer: <>色号整理自公开 MARD 色卡 · 像素字体 Fusion Pixel（OFL）· <a href="#/terms">用户协议与开源许可</a></>,
+  footer: <>色号整理自公开 MARD 色卡 · 字体 Fusion Pixel、Resource Han Rounded、站酷庆科黄油体、得意黑（OFL）· <a href="#/terms">用户协议与开源许可</a></>,
   repoUrl: null,
 };

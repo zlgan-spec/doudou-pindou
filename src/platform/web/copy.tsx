@@ -87,6 +87,6 @@ export const copy: Copy = {
       },
     ],
   },
-  footer: <>色号整理自公开 MARD 色卡 · 抠图 U²-Netp（Apache-2.0）· 像素字体 Fusion Pixel（OFL）· MIT 开源 · <a href={REPO} target="_blank" rel="noreferrer">GitHub</a> · <a href="#/terms">用户协议</a></>,
+  footer: <>色号整理自公开 MARD 色卡 · 抠图 U²-Netp（Apache-2.0）· 字体 Fusion Pixel、Resource Han Rounded、站酷庆科黄油体、得意黑（OFL）· MIT 开源 · <a href={REPO} target="_blank" rel="noreferrer">GitHub</a> · <a href="#/terms">用户协议</a></>,
   repoUrl: REPO,
 };

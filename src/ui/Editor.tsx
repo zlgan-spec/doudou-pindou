@@ -16,7 +16,7 @@ import { Guide } from './Guide';
 import { PalettePicker } from './PalettePicker';
 import { ScrollBar } from './ScrollBar';
 import { embedPatternDataUrl, sheetFileName } from './pngData';
-import { rasterText, textToBitmap } from './text';
+import { fontLoaded, rasterText, TEXT_FONTS, textToBitmap, type TextFont } from './text';
 import { RefWindow, type CellPoint, type CellRect } from './RefWindow';
 import { takeCopiedColor } from './handoff';
 import { SizePicker, type Sizing } from './SizePicker';
@@ -107,11 +107,11 @@ interface Floating {
   scale: number; // 等比倍数，可以是小数；整数倍时一颗豆正好变成 scale×scale 颗，笔画最整齐
   text?: TextSpec; // 文字浮层：缩放、旋转都按字体重新画，不拿位图硬拉
 }
-interface TextSpec { value: string; color: string; bold: boolean; flip: boolean; angle: number }
+interface TextSpec { value: string; font: TextFont; color: string; bold: boolean; flip: boolean; angle: number }
 
 /** 文字浮层：按倍数和角度重新画字，中心点不动 */
 function textFloat(t: TextSpec, scale: number, cx: number, cy: number): Floating {
-  const rows = rasterText(t.value, { scale, angle: t.angle, bold: t.bold, flip: t.flip });
+  const rows = rasterText(t.value, { font: t.font, scale, angle: t.angle, bold: t.bold, flip: t.flip });
   const h = Math.max(1, rows.length), w = Math.max(1, rows[0]?.length ?? 1);
   const cells = rows.flat().map(on => (on ? t.color : null));
   return { cells, w, h, x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), cut: null, base: cells, bw: w, bh: h, scale, text: t };
@@ -235,6 +235,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const [picker, setPicker] = useState<null | { mode: 'brush' } | { mode: 'textColor' } | { mode: 'outline'; ring: number } | { mode: 'replace'; from: string }>(null);
   const [card, setCard] = useState<string | null>(null);
   const [text, setText] = useState('');
+  const [textFont, setTextFont] = useState<TextFont>('pixel');
   const [bitmap, setBitmap] = useState<boolean[][]>([]);
   const stroke = useRef<{ grid: Grid; points: Array<[number, number]> } | null>(null);
   const pinching = useRef(false); // 两根手指在缩放：不画、不选
@@ -614,11 +615,11 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       setBitmap([]);
       return;
     }
-    textToBitmap(text.trim()).then(b => alive && setBitmap(b));
+    textToBitmap(text.trim(), textFont).then(b => alive && setBitmap(b), () => alive && setBitmap([]));
     return () => {
       alive = false;
     };
-  }, [text]);
+  }, [text, textFont]);
 
   const apply = useCallback((grid: Grid, mirrored = doc.mirrored) => {
     if (grid === doc.grid && mirrored === doc.mirrored) return;
@@ -654,15 +655,16 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     }
   };
 
-  // 文字的粗细：只用一种开源像素字体，粗体 = 每一笔往右加厚一颗豆（字和字之间的空隙不会被填上）
+  // 文字的粗细：粗体 = 每一笔往右加厚一颗豆（字和字之间的空隙不会被填上）
   const [textColor, setTextColor] = useState('H7'); // 文字有自己的颜色，默认黑色，不跟着画笔（画笔常是背景色，放上去会看不见）
   const [textBold, setTextBold] = useState(false);
   // 镜像版里加的文字也要镜像，熨烫翻面后文字方向才是对的
-  // bitmap 有内容说明字体已加载好，粗细、镜像都按放上去时的样子重画一遍，格数提示才准
+  // 选中的字体下载好了才重画（换字体时还在下载，就先空着，按钮转圈），粗细、镜像都按放上去时的样子画，格数提示才准
   const placedBitmap = useMemo(
-    () => (bitmap.length ? rasterText(text.trim(), { scale: 1, angle: 0, bold: textBold, flip: doc.mirrored }) : bitmap),
-    [bitmap, text, textBold, doc.mirrored],
+    () => (bitmap.length && fontLoaded(textFont) ? rasterText(text.trim(), { font: textFont, scale: 1, angle: 0, bold: textBold, flip: doc.mirrored }) : []),
+    [bitmap, text, textFont, textBold, doc.mirrored],
   );
+  const textLoading = !!text.trim() && !placedBitmap.length;
   const textSize = placedBitmap.length ? { w: placedBitmap[0].length, h: placedBitmap.length } : null;
 
   // 文字放上去先浮在图纸中间（和复制出来的一样），拖角放大、拖十字移动，再「放下」
@@ -670,9 +672,9 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     const value = text.trim();
     if (!value) return;
     // 打完字马上回车：字体或位图还没准备好，等它好了再放
-    if (!placedBitmap.length && !(await textToBitmap(value)).length) return;
+    if (!placedBitmap.length && !(await textToBitmap(value, textFont).catch(() => [])).length) return;
     setTool('select');
-    setFloat(textFloat({ value, color: textColor, bold: textBold, flip: doc.mirrored, angle: 0 }, 1, doc.grid.width / 2, doc.grid.height / 2));
+    setFloat(textFloat({ value, font: textFont, color: textColor, bold: textBold, flip: doc.mirrored, angle: 0 }, 1, doc.grid.width / 2, doc.grid.height / 2));
   };
 
   // 不限在板内的格子坐标：画笔画到豆板边外时用（松手后豆板四边等量扩大）
@@ -1736,6 +1738,12 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         <div className="adjust-pop text-pop" role="group" aria-label="文字">
           <p className="pop-title">文字</p>
           <input className="text-input" value={text} maxLength={20} placeholder="输入要放上去的文字" onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void placeText(); }} autoFocus />
+          <div className="switch-row static"><span><b>字体</b></span></div>
+          <div className="chips font-pick" role="radiogroup" aria-label="字体">
+            {TEXT_FONTS.map(f => (
+              <button key={f.id} role="radio" aria-checked={textFont === f.id} className={textFont === f.id ? 'on' : ''} onClick={() => setTextFont(f.id)}>{f.label}</button>
+            ))}
+          </div>
           <button className="switch-row" onClick={() => setPicker({ mode: 'textColor' })} title="换文字颜色">
             <span><b>颜色</b></span>
             <em className="ring-color"><i style={{ background: colorOf(textColor).hex }} />{textColor}</em>
@@ -1752,7 +1760,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
               占 {textSize.w}×{textSize.h} 颗{textSize.w > doc.grid.width && '，比豆板宽'}
             </p>
           )}
-          <button className="btn primary block" onClick={() => void placeText()} disabled={!bitmap.length}>放到图纸上</button>
+          <button className={`btn primary block ${textLoading ? 'busy' : ''}`} onClick={() => void placeText()} disabled={!placedBitmap.length}>放到图纸上</button>
         </div>
       )}
       {/* 浮在图纸角上：左下撤销重做，右下缩放 */}

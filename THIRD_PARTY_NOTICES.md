@@ -14,11 +14,37 @@ This project is released under the MIT License (see `LICENSE`). It bundles or de
 
 - npm package `onnxruntime-web` (Microsoft), MIT License. Its WebAssembly runtime is copied to `public/ort/` at build time and served from this site.
 
-## Pixel font — Fusion Pixel Font
+## Text tool fonts
 
-- File: `public/fonts/fusion-pixel-12px-proportional-zh_hans.otf.woff2`, unmodified
-- Source: https://github.com/TakWolf/fusion-pixel-font (release 2026.09.25)
+All four are licensed under the SIL Open Font License 1.1, which allows commercial use, embedding and redistribution. "Common characters" below means GB2312 level-1 hanzi (3,755) plus ASCII and common Chinese punctuation; characters outside a subset fall back to Fusion Pixel 12px.
+
+### Fusion Pixel Font
+
+- Files: `public/fonts/fusion-pixel-12px-proportional-zh_hans.otf.woff2` (release 2026.09.25, unmodified); `public/fonts/fusion-pixel-8px-proportional-zh_hans-common.woff2` (release 2026.11.10, subset to common characters)
+- Source: https://github.com/TakWolf/fusion-pixel-font
+- Copyright (c) 2022, TakWolf
 - License: SIL Open Font License 1.1 (`public/fonts/OFL.txt`)
+
+### Resource Han Rounded
+
+- File: `public/fonts/resource-han-rounded-cn-bold-common.woff2` (CN Bold, release v0.990, subset to common characters)
+- Source: https://github.com/CyanoHao/Resource-Han-Rounded
+- Copyright © 2018—2022 Cyano Hao. Portions © 2014-2021 Adobe, with Reserved Font Name 'Source'.
+- License: SIL Open Font License 1.1 (`public/fonts/OFL-resource-han-rounded.txt`)
+
+### ZCOOL QingKe HuangYou（站酷庆科黄油体）
+
+- File: `public/fonts/zcool-qingke-huangyou-common.woff2` (subset to common characters)
+- Source: https://github.com/google/fonts/tree/main/ofl/zcoolqingkehuangyou
+- Copyright 2018 The ZCOOL QingKe HuangYou Project Authors
+- License: SIL Open Font License 1.1 (`public/fonts/OFL-zcool-qingke-huangyou.txt`)
+
+### Smiley Sans（得意黑）
+
+- File: `public/fonts/SmileySans-Oblique.ttf.woff2`, unmodified (the license reserves the names "Smiley" and "得意黑", so it is not subset)
+- Source: https://github.com/atelier-anchor/smiley-sans (release v2.0.1)
+- Copyright (c) 2022--2024, atelierAnchor, with Reserved Font Name <Smiley> and <得意黑>.
+- License: SIL Open Font License 1.1 (`public/fonts/OFL-smiley-sans.txt`)
 
 ## HEIC decoding — heic2any
 
