@@ -560,6 +560,7 @@ a { color: inherit; }
 .folder-head .btn.link { padding-left: 0; font-size: var(--text-l); color: var(--muted); }
 .folder-head b { font-size: var(--title-s); }
 .folder-head small { font-size: var(--text-m); color: var(--muted); font-variant-numeric: tabular-nums; }
+.folder-subs { margin: -4px 0 14px; }
 .pattern-grid { grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 14px; }
 .pattern-grid .pattern-thumb { aspect-ratio: 1; padding: 7%; } /* 图纸库卡片只有图：方框、少留边，图尽量大 */
 /* 图纸卡片套色卡库的卡片（.color-grid / .color-chip / .color-meta），这里只改图那一块：底色、图居中 */

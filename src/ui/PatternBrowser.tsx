@@ -5,7 +5,7 @@ import { ScrollBar } from './ScrollBar';
 import { SIZES, boardLabel, type SizeId, type StyleId } from '../core/config';
 import { beadCount, legendOf, type Grid } from '../core/grid';
 import { renderSheet, sheetLayout } from '../render/sheet';
-import { buildFilters, primaryCategory, sizeOf } from './library';
+import { DETAIL_TAGS, buildFilters, primaryCategory, sizeOf } from './library';
 import { platform } from '@platform';
 import { setToastHost } from './NoteToast';
 import { embedPatternDataUrl, sheetFileName } from './pngData';
@@ -126,16 +126,28 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
   const q = query.trim().toLowerCase();
   // 文件夹墙：没在搜、没选尺寸、没打开文件夹时
   const wall = library && !q && !size && !openFolder;
+  // 打开的文件夹能按细分标签分成几组（比如第五人格的求生者 / 监管者，每张都带其中一个）时，标题下面出一排筛选；
+  // 只有一部分图纸带的标签（哆啦 A 梦里的「猫咪」）、整个文件夹都有的标签都不出
+  const folderSubs = useMemo(() => {
+    if (!library || !openFolder || q) return [];
+    const chips = [...DETAIL_TAGS].map(name => ({ name, n: openFolder.items.filter(i => i.tags.includes(name)).length }))
+      .filter(c => c.n > 0 && c.n < openFolder.items.length);
+    const covered = openFolder.items.every(i => chips.some(c => i.tags.includes(c.name)));
+    return chips.length > 1 && covered ? chips : [];
+  }, [library, openFolder, q]);
+  // 换文件夹、合上文件夹时筛选回到「全部」；图纸库只在打开的文件夹里按细分筛
+  useEffect(() => { if (library) setSub(null); }, [library, open]);
+  const subOn = library ? (folderSubs.some(c => c.name === sub) ? sub : null) : sub;
   const shownFolders = useMemo(() => folders
     .map(f => (f.id === SINGLES && cat ? { ...f, items: f.items.filter(i => primaryCategory(i.tags) === cat) } : f))
     .filter(f => f.items.length && (!cat || primaryCategory(f.items[0].tags) === cat)), [folders, cat]);
   const list = useMemo(() => (q || !openFolder ? ordered : openFolder.items).filter(i => {
     const s = seriesOf.get(i.id) ?? '';
     if (cat && (q || !openFolder) && primaryCategory(i.tags) !== cat) return false;
-    if (sub && !i.tags.includes(sub)) return false;
+    if (subOn && !i.tags.includes(subOn)) return false;
     if (size && !(i.sizes ?? [i]).some(v => sizeLabel(v.grid) === size)) return false;
     return !q || i.name.toLowerCase().includes(q) || [...i.tags, sizeLabel(i.grid) ?? '', s].some(t => t && t.toLowerCase().includes(q));
-  }), [ordered, openFolder, q, cat, sub, size, seriesOf]);
+  }), [ordered, openFolder, q, cat, subOn, size, seriesOf]);
   const blocks = useMemo(() => [list], [list]);
 
   // 大图里翻页的顺序 = 页面上从左到右、从上到下的顺序；首尾相接
@@ -192,6 +204,16 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
         <div className="folder-head">
           <button className="btn link" onClick={() => go(null)}>← 全部系列</button>
           <b>{openFolder.name}</b><small>{openFolder.items.length}</small>
+        </div>
+      )}
+      {folderSubs.length > 0 && (
+        <div className="chips sub folder-subs" role="tablist" aria-label="标签">
+          <button role="tab" aria-selected={!subOn} className={!subOn ? 'on' : ''} onClick={() => setSub(null)}>{ALL}<small>{openFolder?.items.length}</small></button>
+          {folderSubs.map(c => (
+            <button key={c.name} role="tab" aria-selected={subOn === c.name} className={subOn === c.name ? 'on' : ''} onClick={() => setSub(c.name)}>
+              {c.name}<small>{c.n}</small>
+            </button>
+          ))}
         </div>
       )}
 
