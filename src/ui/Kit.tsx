@@ -111,6 +111,7 @@ export default function Kit() {
           </ul>
           <ul className="color-grid pattern-grid" style={{ maxWidth: 420 }}>
             <li><button aria-label="图纸卡片示例"><span className="color-chip pattern-thumb"><img src={THUMB} alt="" /></span></button></li>
+            <li><button aria-label="打开文件夹时的图纸卡片示例"><span className="color-chip pattern-thumb"><img src={THUMB} alt="" /></span><span className="color-meta"><b>守夜人</b></span></button></li>
           </ul>
         </Block>
 

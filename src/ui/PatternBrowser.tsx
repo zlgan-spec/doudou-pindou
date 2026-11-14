@@ -5,7 +5,7 @@ import { ScrollBar } from './ScrollBar';
 import { SIZES, boardLabel, type SizeId, type StyleId } from '../core/config';
 import { beadCount, legendOf, type Grid } from '../core/grid';
 import { renderSheet, sheetLayout } from '../render/sheet';
-import { DETAIL_TAGS, buildFilters, primaryCategory, sizeOf } from './library';
+import { DETAIL_TAGS, buildFilters, nameInSeries, primaryCategory, sizeOf } from './library';
 import { platform } from '@platform';
 import { setToastHost } from './NoteToast';
 import { embedPatternDataUrl, sheetFileName } from './pngData';
@@ -67,13 +67,13 @@ export interface SeriesGroup {
 /** 旧的系列页网址 #/patterns/s/<系列 id> 还能用：打开就是选中这个系列 */
 const seriesOfHash = () => /^#\/patterns\/s\/([a-z0-9-]+)/.exec(window.location.hash)?.[1] ?? null;
 
-/** 卡片：图纸库只放一张图（名字在悬停提示和大图里）；我的收藏下面写名字 + 豆板 */
-function Card({ item, i, bare, onOpen }: { item: BrowserItem; i: number; bare: boolean; onOpen: (id: string) => void }) {
+/** 卡片：图纸库只放一张图（名字在悬停提示和大图里），打开文件夹时下面写名字（label）；我的收藏下面写名字 + 豆板 */
+function Card({ item, i, bare, label, onOpen }: { item: BrowserItem; i: number; bare: boolean; label?: string; onOpen: (id: string) => void }) {
   return (
     <li style={{ '--i': Math.min(i, 40) } as CSSProperties}>
       <button onClick={() => onOpen(item.id)} aria-label={`查看 ${item.name}`} title={item.name}>
         <span className="color-chip pattern-thumb"><img src={item.thumb} alt="" /></span>
-        {!bare && (
+        {bare ? label && <span className="color-meta"><b>{label}</b></span> : (
           <span className="color-meta">
             <b>{item.name}</b>
             <small className="pattern-size">{sizeLabel(item.grid) ?? `${item.grid.width}×${item.grid.height}`}</small>
@@ -236,11 +236,11 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
       {wall ? null : !list.length ? (
         <p className="color-hint">没有找到{query.trim() ? `「${query.trim()}」` : '这一类的图纸'}，换个{query.trim() ? '名字' : '筛选'}试试</p>
       ) : (
-        // 图纸库的卡片比色卡大一些、只放图（用户主要看图）；我的收藏和色卡库同一套卡片
+        // 图纸库的卡片比色卡大一些、只放图（用户主要看图），打开文件夹时下面加名字；我的收藏和色卡库同一套卡片
         <div className="pattern-blocks">
           {blocks.map((b, bi) => (
             <ul key={bi} className={`color-grid ${library ? 'pattern-grid' : ''}`}>
-              {b.map(item => <Card key={item.id} item={item} i={n++} bare={library} onOpen={setActiveId} />)}
+              {b.map(item => <Card key={item.id} item={item} i={n++} bare={library} label={openFolder && !q ? nameInSeries(item.name, openFolder.name) : undefined} onOpen={setActiveId} />)}
             </ul>
           ))}
         </div>

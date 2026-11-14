@@ -61,7 +61,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
   };
 
   // 「全部」的摆法（用户先按喜好找大类，再看一套套的系列）：
-  // 0. 置顶的系列（index.json 里 pinned: true，放热门的）排最前
+  // 0. 置顶的系列（index.json 里 pinned: true，放热门的）排最前；置顶的有几个时按 index.json 系列清单的先后
   // 1. 按大类分段，顺序照 tags.json「大类」；系列的大类看它第一张的第一个大类标签
   // 2. 同一大类里，系列在前：最近加入的系列在前，同一天的按 index.json 系列清单的先后
   // 3. 不成系列的单张放这一类最后，新的在前；系列里面照系列自己的顺序
@@ -72,7 +72,8 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
     const { groups, singles } = groupSeries({ ...lib, patterns: lib.patterns.filter(p => !p.variantOf) });
     const ordered = groups
       .map((g, order) => ({ ...g, rank: categoryRank(g.patterns[0].tags), date: latest(g.patterns), order }))
-      .sort((a, b) => Number(!!b.series.pinned) - Number(!!a.series.pinned) || a.rank - b.rank || b.date.localeCompare(a.date) || a.order - b.order);
+      .sort((a, b) => Number(!!b.series.pinned) - Number(!!a.series.pinned)
+        || (a.series.pinned ? a.order - b.order : a.rank - b.rank || b.date.localeCompare(a.date) || a.order - b.order));
     const seriesGroups = ordered.map(({ series: s, patterns: ps }) => ({ id: s.id, name: s.name, items: ps.map(p => byId.get(p.id)!), rank: categoryRank(ps[0].tags) }));
     const singleBlocks = new Map<number, LibraryPattern[]>();
     for (const p of singles) {

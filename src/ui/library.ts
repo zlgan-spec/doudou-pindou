@@ -26,6 +26,12 @@ export function primaryCategory(tags: readonly string[]): string | null {
   return tags.find(t => CATEGORY_TAGS.includes(t)) ?? null;
 }
 
+/** 文件夹里卡片上的名字：以「系列名 · 」开头的去掉这段（「第五人格 · 守夜人」→「守夜人」） */
+export function nameInSeries(name: string, series: string): string {
+  const prefix = `${series} · `;
+  return name.startsWith(prefix) && name.length > prefix.length ? name.slice(prefix.length) : name;
+}
+
 export interface FilterChip { name: string; n: number }
 export interface FilterItem { id: string; tags: readonly string[]; size: string | null }
 

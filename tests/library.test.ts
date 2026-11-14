@@ -42,6 +42,14 @@ describe('系列', () => {
     expect(sizes.get('cat')!.map(p => p.id)).toEqual(['cat', 'cat-big']);
   });
 
+  it('文件夹里的名字去掉开头的「系列名 · 」，别的名字不动', async () => {
+    const { nameInSeries } = await import('../src/ui/library');
+    expect(nameInSeries('第五人格 · 守夜人', '第五人格')).toBe('守夜人');
+    expect(nameInSeries('金渐层伸懒腰', '金渐层')).toBe('金渐层伸懒腰');
+    expect(nameInSeries('第五人格 · ', '第五人格')).toBe('第五人格 · ');
+    expect(nameInSeries('布偶猫 · 坐', '散装')).toBe('布偶猫 · 坐');
+  });
+
   it('没有系列清单的旧文件照样能读', () => {
     const lib = parseLibrary({ v: 1, patterns: [pattern('a')] });
     expect(lib.series).toEqual([]);

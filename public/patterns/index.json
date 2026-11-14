@@ -41,7 +41,8 @@
       "id": "identity-v",
       "name": "第五人格",
       "note": "DouDou · AI 原创",
-      "cover": "idv-gardener"
+      "cover": "idv-gardener",
+      "pinned": true
     },
     {
       "id": "golden-cat",
