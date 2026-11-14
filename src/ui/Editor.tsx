@@ -1738,12 +1738,12 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         <div className="adjust-pop text-pop" role="group" aria-label="文字">
           <p className="pop-title">文字</p>
           <input className="text-input" value={text} maxLength={20} placeholder="输入要放上去的文字" onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void placeText(); }} autoFocus />
-          <div className="switch-row static"><span><b>字体</b></span></div>
-          <div className="chips font-pick" role="radiogroup" aria-label="字体">
-            {TEXT_FONTS.map(f => (
-              <button key={f.id} role="radio" aria-checked={textFont === f.id} className={textFont === f.id ? 'on' : ''} onClick={() => setTextFont(f.id)}>{f.label}</button>
-            ))}
-          </div>
+          <label className="switch-row static">
+            <span><b>字体</b></span>
+            <select className="size-pick mini" value={textFont} onChange={e => setTextFont(e.target.value as TextFont)} aria-label="字体">
+              {TEXT_FONTS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+            </select>
+          </label>
           <button className="switch-row" onClick={() => setPicker({ mode: 'textColor' })} title="换文字颜色">
             <span><b>颜色</b></span>
             <em className="ring-color"><i style={{ background: colorOf(textColor).hex }} />{textColor}</em>

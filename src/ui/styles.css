@@ -417,7 +417,6 @@ a { color: inherit; }
 .text-pop .switch-row em i { position: static; width: 18px; height: 18px; background: none; }
 .text-pop .switch-row em i::after { display: none; }
 .text-pop .btn.block { width: calc(100% - 24px); margin: 6px 12px 6px; border-radius: var(--radius-pill); }
-.text-pop .font-pick { flex-wrap: wrap; overflow: visible; margin: 0 12px 6px; padding: 0; } /* 字体：复用筛选标签，一行放不下就折行（手机上也不横滑） */
 .ring-list { list-style: none; margin: 2px 0 0; padding: 0 12px; display: flex; flex-direction: column; }
 .ring-list li { display: flex; align-items: center; gap: 8px; height: 38px; border-top: 1px solid var(--line); font-size: var(--text-m); color: var(--muted); }
 /* 拖动排序的点点：圈数 > 1 才出现；正在拖的那一行铺浅灰底 */
@@ -663,6 +662,7 @@ a { color: inherit; }
 /* 不用系统自带的下拉箭头（它紧贴右边，圆角里看着像被切了一块），自己画一个，离边 18px */
 .size-pick { flex: none; height: var(--control-l); padding: 0 40px 0 18px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 12 12%22 fill=%22none%22 stroke=%22%238a8a8a%22 stroke-width=%221.6%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M2.5 4.5 6 8l3.5-3.5%22/%3E%3C/svg%3E") no-repeat right 18px center / 12px; color: var(--ink); font: inherit; font-size: var(--text-l); appearance: none; -webkit-appearance: none; cursor: pointer; }
 .size-pick:focus-visible { outline: none; border-color: var(--ink); box-shadow: var(--ring-focus); }
+.size-pick.mini { height: auto; padding: 6px 32px 6px 14px; line-height: normal; border: 0; background-color: var(--fill); background-position: right 12px center; font-size: var(--text-s); } /* 小号：和 .seg.mini 一样高、一起放在一行右边，比如文字小窗的「字体」 */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 /* 第二排（系列和标签）：比第一排轻一档，只描边 */
 .chips.sub button { background: none; box-shadow: inset var(--ring-line); }
@@ -828,6 +828,7 @@ a { color: inherit; }
   .layout { grid-template-columns: 1fr; gap: 20px; }
   .empty { min-height: 200px; }
   .seg button, .btn, .current-color { min-height: 40px; }
+  .size-pick.mini { min-height: var(--control-m); } /* 和手机上加高的 .seg.mini 对齐 */
   .topbar .btn, .chips button { min-height: var(--control-s); }
   .float-bar { bottom: 10px; }
   .float-bar.left { left: 10px; }
