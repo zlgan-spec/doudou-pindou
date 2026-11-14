@@ -3,13 +3,13 @@
 // 小像素、圆体、黄油体只带常用字（GB2312 一级字 + 英文标点），没带的字用默认像素字补上；
 // 得意黑的许可不许改过的版本再叫这个名字，所以用原版文件、不裁字。
 export type TextFont = 'pixel' | 'mini' | 'round' | 'butter' | 'smiley';
-// 下拉里写字体本来的名字（像 Figma 选字体那样）；缝合像素字体有 12 和 8 像素两个大小，小的那个写「小号」
+// 下拉里的名字都在四个字以内（全名太长，放在小窗里怪）：缝合像素字体 12 / 8 像素、资源圆体、站酷庆科黄油体、得意黑
 export const TEXT_FONTS: { id: TextFont; label: string }[] = [
-  { id: 'pixel', label: '缝合像素字体' },
-  { id: 'mini', label: '缝合像素字体 小号' },
-  { id: 'round', label: '资源圆体' },
-  { id: 'butter', label: '站酷庆科黄油体' },
-  { id: 'smiley', label: '得意黑' },
+  { id: 'pixel', label: '像素字体' },
+  { id: 'mini', label: '小像素体' },
+  { id: 'round', label: '圆体' },
+  { id: 'butter', label: '黄油体' },
+  { id: 'smiley', label: '得意黑体' },
 ];
 const FONTS: Record<TextFont, { family: string; file: string; px: number }> = {
   pixel: { family: 'FusionPixel12', file: 'fusion-pixel-12px-proportional-zh_hans.otf.woff2', px: 12 },
