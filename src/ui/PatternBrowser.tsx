@@ -471,8 +471,7 @@ function Viewer({ item: card, prefer, actions, onClose, onStep }: { item: Browse
     };
   }, []);
   useEffect(() => {
-    const el = dialog.current;
-    if (!el) return;
+    // 挂在整页上：大图一打开焦点就被拿掉、落在 body 上，挂在弹窗上要先点一下弹窗才收得到按键
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key.toLowerCase() === 'f') { e.preventDefault(); setFullScreen(!fullRef.current); return; }
@@ -482,8 +481,8 @@ function Viewer({ item: card, prefer, actions, onClose, onStep }: { item: Browse
       e.preventDefault();
       stepRef.current(d);
     };
-    el.addEventListener('keydown', onKey);
-    return () => el.removeEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, []);
 
   return (
