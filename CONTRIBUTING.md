@@ -45,7 +45,7 @@ npm run build      # 类型检查 + 打包
 
 ### 小红书小工具版
 
-同一份代码的另一个构建（`vite build --mode xhs`，产物在 `dist-xhs/`）：没有抠图模型和后台线程、图纸库打进包里（只带作者 DouDou、出处 AI 原创的图纸）、保存图纸走平台的存相册接口、兼容 Chrome 61。
+同一份代码的另一个构建（`vite build --mode xhs`，产物在 `dist-xhs/`）：没有抠图模型和后台线程、图纸库打进包里（只带作者 DouDou、出处 AI 原创的图纸，不带原图）、保存图纸走平台的存相册接口、兼容 Chrome 61。
 
 ```bash
 npm run build:xhs   # 类型检查 + 构建
@@ -56,7 +56,7 @@ npm run pack:xhs    # 构建 + 文件类型检查 + 不含网站版代码检查 
 
 ### 本地预览的两个开关（只在开发服务器里生效）
 
-- `DOUDOU_LIBRARY=/path/to/index.json npm run dev`：用这份图纸库文件代替 `public/patterns/index.json`，预览还没上线的图纸
+- `DOUDOU_LIBRARY=/path/to/index.json npm run dev`：用这份图纸库文件代替 `public/patterns/index.json`，预览还没上线的图纸；原图从那份文件旁边的 `refs/` 文件夹读
 - `DOUDOU_TEST_IMAGES=/path/to/images npm run dev`：出图测试台（`harness.html`）从这个文件夹读测试图，默认是 `test-images/`（不进仓库）
 
 ## 给图纸库加图纸
@@ -127,3 +127,4 @@ node scripts/add-pattern.mjs 图纸.png --id cat-cafe-coaster --tags 猫咪,杯�
 - 每张图纸只存图案范围，一行一个字符串：`.` 是空格，其他字符按顺序对应 `colors` 里的色号（`0` 是第一个色号）
 - 一套至少 3 张才在「全部」里收成一张系列卡；系列清单的先后就是显示的先后；图纸名以系列名加空格或「·」开头的，系列页里只显示后半段
 - 网站读这个文件时会逐条检查，色号不在 MARD 221 色里、行长不一致、标签不在词表里的会被跳过或去掉
+- 图纸可以带原图：`"ref": "idv-mercenary.png"`，只写文件名（小写字母、数字、短横线，后缀 png / jpg / webp），文件放在 `index.json` 同级的 `refs/` 里（公开仓库是 `public/patterns/refs/`）。拿去改、收藏后编辑器里能打开原图小窗对照。原图整张对应图纸里有豆子的那块，最好裁成同样的范围和比例。另一个尺寸（`--variant-of`）不用写，自动用主图的；带路径或网址的不认
