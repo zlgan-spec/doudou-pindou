@@ -16,6 +16,8 @@
   --bead-face: #ffffff;
   --danger: #dc2626;
   --on-ink: #ffffff;
+  --accent: #a855f7; /* 品牌紫（docs/brand/brand-guide.html），深浅两套界面同一个 */
+  --on-accent: #ffffff;
   /* —— 档位：新写样式只从这里取值，档位外的值要在同一行写「特例：原因」的注释（tests/style-scale.test.ts 会查） —— */
   /* 字号：角标 / 辅助说明 / 标签 / 按钮和正文 / 输入框和重点正文；标题三档。首页大标题随屏宽变，直接写 clamp（特例） */
   --text-xs: 11px;
@@ -189,6 +191,8 @@ a { color: inherit; }
 .btn.pill { border-radius: var(--radius-pill); }
 .btn.primary { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
 .btn.primary:hover:not(:disabled) { background: var(--ink); opacity: 0.86; }
+.btn.accent { background: var(--accent); border-color: var(--accent); color: var(--on-accent); } /* 品牌紫，首页「看看图纸库」 */
+.btn.accent:hover:not(:disabled) { background: var(--accent); opacity: 0.86; }
 .btn.soft { background: var(--fill); border-color: transparent; }
 .btn.soft:hover:not(:disabled) { background: var(--line); }
 .btn.link { border-color: transparent; background: none; padding-left: 8px; padding-right: 8px; }

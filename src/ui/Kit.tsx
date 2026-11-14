@@ -69,6 +69,7 @@ export default function Kit() {
             <button className="btn link">文字按钮</button>
             <button className="btn pill">胶囊</button>
             <button className="btn primary pill">胶囊主按钮</button>
+            <button className="btn accent pill">胶囊紫按钮</button>
             <button className="btn small">小号</button>
             <button className="btn pill" aria-pressed>已按下</button>
             <button className="btn" disabled>不可点</button>
