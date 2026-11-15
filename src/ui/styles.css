@@ -575,11 +575,12 @@ a { color: inherit; }
   .folder:hover .folder-papers img:nth-child(3) { transform: translate(50%, -4%) rotate(7deg); }
 }
 .folder:active { transform: scale(0.98); }
-.folder-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
-.folder-head .btn.link { padding-left: 0; font-size: var(--text-l); color: var(--muted); }
+.folder-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.color-tools + .folder-head { margin-top: -18px; } /* 系列页：分类行 → 标题 → 小分类 → 卡片，三段都和卡片间距一样 10px */
+.folder-head .btn.link { min-height: 0; padding: 6px 8px 6px 0; margin: -6px 0; font-size: var(--text-l); color: var(--muted); } /* 点击区上下各留 6px，但不把这一行撑高 */
 .folder-head b { font-size: var(--title-s); }
 .folder-head small { font-size: var(--text-m); color: var(--muted); font-variant-numeric: tabular-nums; }
-.folder-subs { margin: -4px 0 14px; }
+.chips.folder-subs { margin-top: 0; margin-bottom: 10px; } /* 两个类名：压过手机版 .chips 的 margin 简写，不然下边距被清成 0 */
 .pattern-grid { grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 14px; }
 .pattern-grid .pattern-thumb { aspect-ratio: 1; padding: 0; } /* 图纸库卡片只有图：方框，图直接铺满卡片里面 */
 .pattern-grid .pattern-thumb img { border-radius: var(--radius-s); } /* 和卡片的圆角同心（卡片 16 − 内边距 6） */

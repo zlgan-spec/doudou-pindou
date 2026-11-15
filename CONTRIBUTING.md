@@ -45,7 +45,7 @@ npm run build      # 类型检查 + 打包
 
 ### 小红书小工具版
 
-同一份代码的另一个构建（`vite build --mode xhs`，产物在 `dist-xhs/`）：没有抠图模型和后台线程、图纸库打进包里（只带作者 DouDou、出处 AI 原创的图纸，不带原图）、保存图纸走平台的存相册接口、兼容 Chrome 61。
+同一份代码的另一个构建（`vite build --mode xhs`，产物在 `dist-xhs/`）：没有抠图模型和后台线程、图纸库打进包里（只带作者 DouDou、出处 AI 原创的图纸；原图用 macOS 自带的 `sips` 压成长边 360 的 JPG 一起打进包，拿去改后也能开原图对照）、保存图纸走平台的存相册接口、兼容 Chrome 61。
 
 ```bash
 npm run build:xhs   # 类型检查 + 构建

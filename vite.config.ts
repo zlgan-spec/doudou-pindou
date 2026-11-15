@@ -3,8 +3,9 @@
 // - 默认（npm run build）：网站版，部署到 GitHub Pages
 // - --mode xhs（npm run build:xhs）：小红书小工具版，产物在 dist-xhs/，再由 scripts/pack-xhs.mjs 打成 zip
 // 渠道差异都在 src/platform/ 里，@platform 别名按 mode 指向 web 或 xhs 那份实现，另一份不会进包。
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, readFile, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFile, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
@@ -98,8 +99,8 @@ function securityHeaders(): Plugin {
 // 容器要求（见官方 Skill minitool-zip-builder）：资源全用相对路径；不能联网；不能有内联 <script>、type="module"、import/export，
 // 只能是经典脚本；JS 转译到 ES2017 / Chrome 61，CSS 也按 Chrome 61 降级；不能带 source map 和构建配置
 
-// 图纸库打进包里（容器禁 fetch）：从 public/patterns/index.json 只取作者 DouDou、出处 AI 原创的图纸，不带外链和原图字段（包有大小上限，原图不进包）；
-// 系列只留还有图纸的。规则改了要同步 CONTRIBUTING.md
+// 图纸库打进包里（容器禁 fetch）：从 public/patterns/index.json 只取作者 DouDou、出处 AI 原创的图纸，不带外链字段；
+// 原图字段保留，文件名换成 .jpg（包有大小上限，原图压成小 JPG 放进包里，见 xhsPublic）；系列只留还有图纸的。规则改了要同步 CONTRIBUTING.md
 const LIBRARY_ID = 'virtual:library-data';
 function libraryData(): Plugin {
   return {
@@ -112,7 +113,7 @@ function libraryData(): Plugin {
       };
       const patterns = src.patterns
         .filter(p => p.author === 'DouDou' && p.source === 'AI 原创')
-        .map(({ link: _link, ref: _ref, ...p }) => { void _link; void _ref; return p; });
+        .map(({ link: _link, ...p }) => { void _link; return typeof p.ref === 'string' ? { ...p, ref: p.ref.replace(/\.(png|jpe?g|webp)$/, '.jpg') } : p; });
       const used = new Set(patterns.map(p => p.series));
       const series = src.series.filter(s => used.has(s.id));
       return `export default ${JSON.stringify({ v: src.v, series, patterns })};`;
@@ -144,7 +145,8 @@ function xhsHtml(): Plugin {
   };
 }
 
-// public/ 里网站版才用的东西（抠图模型、图纸库 json、图标）不进小工具包：关掉 publicDir，只把字体拷过去
+// public/ 里网站版才用的东西（抠图模型、图纸库 json、图标）不进小工具包：关掉 publicDir，只把字体和原图拷过去
+// 原图：小工具里用到的图纸的原图，用 macOS 自带的 sips 压成长边 360 的 JPG（质量 80），放在 patterns/refs/，拿去改时编辑器里能开原图对照
 function xhsPublic(): Plugin {
   return {
     name: 'xhs-public',
@@ -152,6 +154,17 @@ function xhsPublic(): Plugin {
     closeBundle() {
       // 只拷字体文件本身；许可全文 OFL.txt 不在容器允许的文件类型里，协议页里已经带了全文
       cpSync(path.join(ROOT, 'public/fonts'), path.join(ROOT, 'dist-xhs/fonts'), { recursive: true, filter: src => !src.endsWith('.txt') });
+      const src = JSON.parse(readFileSync(path.join(ROOT, 'public/patterns/index.json'), 'utf8')) as { patterns: Array<Record<string, unknown>> };
+      const refs = new Set(src.patterns
+        .filter(p => p.author === 'DouDou' && p.source === 'AI 原创' && typeof p.ref === 'string')
+        .map(p => p.ref as string));
+      const out = path.join(ROOT, 'dist-xhs/patterns/refs');
+      mkdirSync(out, { recursive: true });
+      for (const name of refs) {
+        if (!/^[a-z0-9][a-z0-9-]{0,54}\.(png|jpe?g|webp)$/.test(name)) throw new Error(`原图文件名不对：${name}`);
+        const to = path.join(out, name.replace(/\.(png|jpe?g|webp)$/, '.jpg'));
+        execFileSync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '80', '-Z', '360', path.join(ROOT, 'public/patterns/refs', name), '--out', to], { stdio: 'ignore' });
+      }
     },
   };
 }
