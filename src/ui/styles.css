@@ -845,8 +845,12 @@ a { color: inherit; }
   .field-head { flex-direction: column; align-items: flex-start; gap: 2px; }
   .field-head small { text-align: left; }
   .viewer { height: calc(100dvh - 24px); }
-  .viewer[open] { grid-template-columns: 1fr; grid-template-rows: 56dvh auto; overflow: auto; }
-  .viewer-info { padding: 18px 16px; border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  /* 看图区高度跟着图纸比例走（大图纸差不多是正方形，四周各 20 内边距），最多 56% 屏高：不在图纸上下留一大块空白，一屏能看到底下的按钮 */
+  .viewer[open] { grid-template-columns: 1fr; grid-template-rows: max-content max-content; overflow: auto; } /* max-content：矮屏放不下时整体往下滚，看图区不会被压扁、盖住下面的信息 */
+  .viewer-left { aspect-ratio: 1 / 1.04; max-height: 56dvh; }
+  @supports not (aspect-ratio: 1) { .viewer-left { height: 100vw; max-height: 56vh; } }
+  .viewer-info { gap: 12px; padding: 14px 16px 18px; border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .viewer-facts div { padding: 8px 0; }
   /* 小工具顶部有状态栏和小红书的按钮：大图窗口从它们下面开始；关闭按钮位置不变（标题右边），和「存相册」一样实心填充（浅色界面黑底白叉），往下滚也一直在 */
   .viewer[open] { top: var(--top-inset, 0px); bottom: auto; margin: 0 auto; height: calc(100vh - 12px); height: calc(var(--app-h, 100vh) - var(--top-inset, 0px) - 12px); }
   .viewer-close { background: var(--ink); color: var(--on-ink); }
