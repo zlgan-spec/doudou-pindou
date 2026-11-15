@@ -99,7 +99,7 @@ function securityHeaders(): Plugin {
 // 容器要求（见官方 Skill minitool-zip-builder）：资源全用相对路径；不能联网；不能有内联 <script>、type="module"、import/export，
 // 只能是经典脚本；JS 转译到 ES2017 / Chrome 61，CSS 也按 Chrome 61 降级；不能带 source map 和构建配置
 
-// 图纸库打进包里（容器禁 fetch）：从 public/patterns/index.json 只取作者 DouDou、出处 AI 原创的图纸，不带外链字段；
+// 图纸库打进包里（容器禁 fetch）：从 public/patterns/index.json 只取作者 DouDou、出处以「AI 原创」开头的图纸（可以带「· 参考某某」），不带外链字段；
 // 原图字段保留，文件名换成 .jpg（包有大小上限，原图压成小 JPG 放进包里，见 xhsPublic）；系列只留还有图纸的。规则改了要同步 CONTRIBUTING.md
 const LIBRARY_ID = 'virtual:library-data';
 function libraryData(): Plugin {
@@ -112,7 +112,7 @@ function libraryData(): Plugin {
         v: unknown; series: Array<{ id: string }>; patterns: Array<Record<string, unknown>>;
       };
       const patterns = src.patterns
-        .filter(p => p.author === 'DouDou' && p.source === 'AI 原创')
+        .filter(p => p.author === 'DouDou' && String(p.source).startsWith('AI 原创'))
         .map(({ link: _link, ...p }) => { void _link; return typeof p.ref === 'string' ? { ...p, ref: p.ref.replace(/\.(png|jpe?g|webp)$/, '.jpg') } : p; });
       const used = new Set(patterns.map(p => p.series));
       const series = src.series.filter(s => used.has(s.id));
@@ -156,7 +156,7 @@ function xhsPublic(): Plugin {
       cpSync(path.join(ROOT, 'public/fonts'), path.join(ROOT, 'dist-xhs/fonts'), { recursive: true, filter: src => !src.endsWith('.txt') });
       const src = JSON.parse(readFileSync(path.join(ROOT, 'public/patterns/index.json'), 'utf8')) as { patterns: Array<Record<string, unknown>> };
       const refs = new Set(src.patterns
-        .filter(p => p.author === 'DouDou' && p.source === 'AI 原创' && typeof p.ref === 'string')
+        .filter(p => p.author === 'DouDou' && String(p.source).startsWith('AI 原创') && typeof p.ref === 'string')
         .map(p => p.ref as string));
       const out = path.join(ROOT, 'dist-xhs/patterns/refs');
       mkdirSync(out, { recursive: true });
