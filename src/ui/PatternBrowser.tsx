@@ -300,17 +300,64 @@ function SheetStage({ item }: { item: BrowserItem }) {
   const maxZoom = fit ? Math.max(2, 64 / (L.cell * fit)) : 1; // 放大到一格约 64 像素为止
   const cw = L.width * fit * zoom, ch = L.height * fit * zoom;
 
-  // 清晰度：缩放停下来再按屏幕上的大小重画
-  const [renderScale, setRenderScale] = useState(1);
+  // 清晰度：缩放停下来再按屏幕上的大小重画。
+  // 整张画布的像素有上限：手机浏览器（尤其 iOS，约 1677 万像素）超过就整张画不出来、变成空白。
+  // 所以整张最多画到 1600 万像素；再放大时另叠一块只画看得见那部分的清晰画布（和编辑器同一个办法）
+  const PIXEL_BUDGET = 16e6;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const maxScale = Math.min(2.5, Math.sqrt(PIXEL_BUDGET / (L.width * L.height)));
+  const [renderScale, setRenderScale] = useState(() => Math.min(1, maxScale));
   useEffect(() => {
     if (!fit) return;
-    const want = Math.min(2.5, Math.max(0.5, fit * zoom * (window.devicePixelRatio || 1)));
+    const want = Math.min(maxScale, Math.max(0.5, fit * zoom * dpr));
     const t = window.setTimeout(() => setRenderScale(want), 120);
     return () => window.clearTimeout(t);
-  }, [fit, zoom]);
+  }, [fit, zoom, dpr, maxScale]);
   useEffect(() => {
     if (canvas.current) renderSheet(item.grid, { mirrored: item.mirrored, title: item.name, scale: renderScale }, canvas.current);
   }, [item, renderScale]);
+
+  // 清晰画布画的是哪一块（版式坐标）：看得见的范围四周多留 30%，滚动出了这块、或缩放停下来才换一块重画
+  const detailCanvas = useRef<HTMLCanvasElement>(null);
+  const [detail, setDetail] = useState<{ x: number; y: number; w: number; h: number; zoom: number } | null>(null);
+  const updateDetail = useCallback(() => {
+    const el = box.current, c = canvas.current, z = zoomRef.current;
+    if (!fit || !el || !c || fit * z * dpr <= maxScale * 1.02) return setDetail(null);
+    const cr = c.getBoundingClientRect(), vr = el.getBoundingClientRect();
+    const k = cr.width / L.width;
+    if (!k) return;
+    const vx0 = (Math.max(vr.left, cr.left) - cr.left) / k, vx1 = (Math.min(vr.right, cr.right) - cr.left) / k;
+    const vy0 = (Math.max(vr.top, cr.top) - cr.top) / k, vy1 = (Math.min(vr.bottom, cr.bottom) - cr.top) / k;
+    if (vx1 <= vx0 || vy1 <= vy0) return;
+    setDetail(d => {
+      if (d && d.zoom === z && d.x <= vx0 && d.y <= vy0 && d.x + d.w >= vx1 && d.y + d.h >= vy1) return d;
+      const mx = (vx1 - vx0) * 0.3, my = (vy1 - vy0) * 0.3;
+      const x = Math.max(0, vx0 - mx), y = Math.max(0, vy0 - my);
+      return { x, y, w: Math.min(L.width, vx1 + mx) - x, h: Math.min(L.height, vy1 + my) - y, zoom: z };
+    });
+  }, [fit, dpr, maxScale, L.width, L.height]);
+  useEffect(() => {
+    const t = window.setTimeout(updateDetail, 120);
+    return () => window.clearTimeout(t);
+  }, [zoom, updateDetail]);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let frame = 0;
+    const onScroll = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(updateDetail); };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => { cancelAnimationFrame(frame); el.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); };
+  }, [updateDetail]);
+  useEffect(() => {
+    if (detail && detailCanvas.current && fit) {
+      renderSheet(item.grid, { mirrored: item.mirrored, title: item.name, scale: fit * detail.zoom * dpr, region: detail }, detailCanvas.current);
+    }
+  }, [item, detail, fit, dpr]);
+  const dk = fit * zoom; // 屏幕上一个版式单位多宽
+  const detailStyle = detail && detail.zoom === zoom
+    ? { left: detail.x * dk, top: detail.y * dk, width: detail.w * dk, height: detail.h * dk }
+    : { display: 'none' };
 
   const pending = useRef<[number, number] | null>(null);
   const zoomTo = useCallback((next: number, anchor?: [number, number]) => {
@@ -417,7 +464,10 @@ function SheetStage({ item }: { item: BrowserItem }) {
         }}
       >
         <div className="viewer-pad" style={{ width: Math.max(cw + PAD * 2, room?.[0] ?? 0), height: Math.max(ch + PAD * 2, room?.[1] ?? 0) }}>
-          <canvas ref={canvas} style={{ width: cw, height: ch }} />
+          <div className="viewer-canvas" style={{ width: cw, height: ch }}>
+            <canvas ref={canvas} style={{ width: cw, height: ch }} />
+            <canvas ref={detailCanvas} className="sheet-detail" style={detailStyle} aria-hidden />
+          </div>
         </div>
       </div>
       {fit > 0 && (

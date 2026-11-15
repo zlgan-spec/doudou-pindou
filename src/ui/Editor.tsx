@@ -292,7 +292,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   // 清晰度：画布按「屏幕上显示的大小 × 屏幕清晰度」画，放大后也是锐利的。
   // 整张画布的像素有上限（太大浏览器会卡或画不出来）：大图放大到整张画不清楚时，另叠一块只画看得见那部分的清晰画布，
   // 所以任何尺寸都能放大到一颗豆 64 像素
-  const PIXEL_BUDGET = 40e6;
+  const PIXEL_BUDGET = 16e6; // iOS（含小红书里）一张画布最多约 1677 万像素，超过整张变空白
   const dpr = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 3);
   const maxScale = Math.sqrt(PIXEL_BUDGET / (natural.width * natural.height));
   const maxZoom = fit ? Math.max(1, 2 / fit.scale) : 1;

@@ -608,6 +608,8 @@ a { color: inherit; }
 .viewer-sheet.dragging { cursor: grabbing; }
 .viewer-pad { display: flex; align-items: center; justify-content: center; }
 .viewer-sheet canvas { display: block; flex: none; border-radius: var(--radius-s); box-shadow: var(--ring-line); }
+.viewer-canvas { position: relative; flex: none; }
+.viewer-sheet canvas.sheet-detail { border-radius: 0; box-shadow: none; } /* 放大后叠在上面、只画看得见那块的清晰画布 */
 .viewer-zoom { position: absolute; right: 14px; bottom: 14px; }
 /* 大图全屏（按 F）：铺满屏幕，信息栏收起，只留看图区；看图区结构不变，放大不会撑开 */
 .viewer.full { width: 100vw; height: 100dvh; max-height: none; border: 0; border-radius: 0; }

@@ -23,8 +23,9 @@ interface Props {
   onClose: () => void;
 }
 
-const KEY = 'bead-ref-window';
-const MIN_W = 140;
+const KEY = 'bead-ref-window-v2'; // v2：手机默认改成左上角小窗，旧的位置不沿用
+const MIN_W = 96;
+const PHONE = 600; // 图纸区比这窄就按手机摆
 interface Saved { x: number; y: number; w: number; min: boolean }
 
 function load(): Saved | null {
@@ -48,11 +49,14 @@ export function RefWindow({ reference, mirrored, gridWidth, visibleCells, viewEl
     try { platform.storage.setItem(KEY, JSON.stringify(state)); } catch { /* 存不下就算了 */ }
   }, [state]);
 
-  // 第一次打开：放到图纸区右上角
+  // 第一次打开：手机放左上角、宽度取图纸区的三分之一，少挡图纸；电脑放右上角、220 宽。拖过、缩放过就记下来
   useEffect(() => {
     if (state.x >= 0) return;
     const parent = root.current?.parentElement;
-    if (parent) setState(s => ({ ...s, x: Math.max(14, parent.clientWidth - s.w - 14) }));
+    if (!parent) return;
+    const pw = parent.clientWidth;
+    if (pw < PHONE) setState(s => ({ ...s, x: 8, y: 8, w: Math.max(MIN_W, Math.min(220, Math.round(pw / 3))) }));
+    else setState(s => ({ ...s, x: Math.max(14, pw - s.w - 14) }));
   }, [state.x]);
 
   // 记下的位置可能是在更宽的屏幕上拖的（电脑上拖到右边，换手机就跑出屏幕了）：打开时、窗口变化时拉回图纸区里

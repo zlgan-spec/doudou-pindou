@@ -3,7 +3,7 @@
 // 平台单个 key 最大 1 MB：超过的值拆成几段存（key#0、key#1…），另存一个段数。
 // 平台接口不可用（低版本客户端、普通浏览器预览）时退回 localStorage，读写失败都当没存过。
 
-const KEYS = ['bead-theme', 'bead-draft', 'bead-copied-color', 'bead-patterns-v1', 'bead-list-collapsed', 'doudou-guide-v1', 'bead-ref-window', 'doudou-follow-asked-v1'];
+const KEYS = ['bead-theme', 'bead-draft', 'bead-copied-color', 'bead-patterns-v1', 'bead-list-collapsed', 'doudou-guide-v1', 'bead-ref-window-v2', 'doudou-follow-asked-v1'];
 const CHUNK = 400 * 1024; // 按字符切；中文 UTF-8 最多 3 字节一个，400K 字符不会超过 1 MB 太多，留余量取 400K
 const MIN_CLIENT = 9460;
 
