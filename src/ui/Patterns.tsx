@@ -139,7 +139,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
             <>
               <SheetExportButton onExport={() => downloadSheet({ ...sized(p), size: sizeOf(p.grid) ?? undefined })} />
               <button className="btn pill" aria-pressed={isStarred} onClick={() => toggleStar(p)}>{isStarred ? '已收藏' : '收藏'}</button>
-              <button className="btn pill accent" onClick={() => { close(); onOpen(toEntry(sized(p)), 'library'); }}>拿去改</button>
+              <button className="btn pill" onClick={() => { close(); onOpen(toEntry(sized(p)), 'library'); }}>拿去改</button>
             </>
           );
         }}

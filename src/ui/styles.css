@@ -438,6 +438,7 @@ a { color: inherit; }
 .tool-rail .rail-adjust.active::after { content: ''; position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #A855F7); box-shadow: 0 0 0 2px var(--surface); /* 特例：和旁边按钮隔开的一圈底色 */ } /* 开了至少一项调整 */
 .tool-rail .rail-color { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); border-radius: 0 0 var(--radius-s) var(--radius-s); color: var(--ink); font-family: var(--mono); }
 .tool-rail .rail-color i { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.12); }
+.tool-rail .rail-color.idle { opacity: 0.45; } /* 不在画笔、填充时：位置照旧留着，淡一点；点它回到画笔或填充并选颜色 */
 /* 底部正中的提示（左右是撤销和缩放） */
 /* 选区上方弹出的三个按钮 */
 /* 浮起来的一块：四角的小方块拖动等比放大，中间十字拖动移动 */
@@ -916,8 +917,9 @@ a { color: inherit; }
   .page-actions:not(:empty) { bottom: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
   .page-make .toast { bottom: 92px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
   .frame { padding-bottom: env(safe-area-inset-bottom, 0px); }
-  /* 工具栏九个工具一屏放下，不用横着滑 */
-  .tool-rail button { flex: 1 1 0; width: auto; min-width: 34px; }
+  /* 工具栏十个按钮（七个工具、描边、调整、颜色）一屏放下，不用横着滑：按钮之间不留空，最窄 28px（两个字放得下） */
+  .tool-rail { gap: 0; }
+  .tool-rail button { flex: 1 1 0; width: auto; min-width: 28px; }
   .tool-rail .rail-adjust, .tool-rail .rail-color { margin-left: 2px; }
 }
 /* 横屏手机：图纸区按屏幕高度给，不跟着宽度算成一条 */

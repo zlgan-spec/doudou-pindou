@@ -199,6 +199,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   // 用过手写笔（iPad + Pencil）之后：笔负责画，手指只负责拖动和缩放
   const [penMode, setPenMode] = useState(false);
   const setTool = (t: Tool) => {
+    tempTool.current = null; // 按住空格 / Alt 时点了工具栏：以点的为准，松开按键不再换回去
     if (t === 'brush' || t === 'fill' || t === 'text') lastPaintTool.current = t;
     if (t !== 'select') {
       if (float) placeFloat(float);
@@ -237,7 +238,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   const [text, setText] = useState('');
   const [textFont, setTextFont] = useState<TextFont>('pixel');
   const [bitmap, setBitmap] = useState<boolean[][]>([]);
-  const stroke = useRef<{ grid: Grid; points: Array<[number, number]> } | null>(null);
+  const stroke = useRef<{ grid: Grid; points: Array<[number, number]>; tool: 'brush' | 'eraser' } | null>(null); // 记住这一笔用的工具：画到一半按空格 / Alt 临时换工具，不能把这一笔变成擦除
   const pinching = useRef(false); // 两根手指在缩放：不画、不选
   const justStroked = useRef(false);
 
@@ -372,6 +373,9 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         // 第二根手指按下：这次整个手势都算缩放，到手指全部抬起前不画；第一根手指已经预览上去的豆子擦掉
         pinching.current = true;
         stroke.current = null;
+        selDrag.current = null; // 第一根手指在选区里按下的拖动也作废，不然缩放完下一笔会被当成选区拖动吞掉
+        setSelDragging(false);
+        justStroked.current = false;
         redrawRef.current();
       }
     };
@@ -754,7 +758,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     const cell = hitCell(doc.grid, sx, sy) ?? (tool === 'brush' && hitLegend(doc.grid, sx, sy) < 0 ? rawCell(sx, sy) : null);
     if (!cell) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    stroke.current = { grid: doc.grid, points: [cell] };
+    stroke.current = { grid: doc.grid, points: [cell], tool };
     paintLive(cell[0], cell[1], tool === 'brush' ? color : null);
   };
 
@@ -775,14 +779,14 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       return;
     }
     drawOverlay();
-    const at = stroke.current && tool === 'brush' ? rawCell(...toSheet(e)) : cell;
+    const at = stroke.current?.tool === 'brush' ? rawCell(...toSheet(e)) : cell;
     if (!stroke.current || !at) return;
     const last = stroke.current.points[stroke.current.points.length - 1];
     if (last[0] === at[0] && last[1] === at[1]) return;
     // 快速拖动时两次事件之间会跳过好几格，按直线补上中间的格子
     for (const p of lineCells(last, at)) {
       stroke.current.points.push(p);
-      paintLive(p[0], p[1], tool === 'brush' ? color : null);
+      paintLive(p[0], p[1], stroke.current.tool === 'brush' ? color : null);
     }
   };
 
@@ -811,10 +815,10 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       return;
     }
     if (!stroke.current) return;
-    const { grid, points } = stroke.current;
+    const { grid, points, tool: strokeTool } = stroke.current;
     stroke.current = null;
     justStroked.current = true;
-    if (tool === 'brush') {
+    if (strokeTool === 'brush') {
       const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
       const grown = growToFit(grid, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
       if (grown) {
@@ -823,7 +827,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
         return;
       }
     }
-    const next = paintCells(grid, points, tool === 'brush' ? color : null);
+    const next = paintCells(grid, points, strokeTool === 'brush' ? color : null);
     // 什么都没改（比如橡皮擦在空格上）时表格不变、不会触发重画，要手动把被实时预览盖住的网格线画回来
     if (next === grid) redraw();
     else apply(next);
@@ -1034,7 +1038,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   setToolRef.current = setTool;
   const toolRef = useRef(tool);
   toolRef.current = tool;
-  const tempTool = useRef<null | { key: string; back: Tool }>(null); // 按住空格 / Alt 临时换的工具，松开换回
+  const tempTool = useRef<null | { key: string; back: Tool; to: Tool }>(null); // 按住空格 / Alt 临时换的工具，松开换回
   const toggleFullRef = useRef(() => {});
   toggleFullRef.current = () => (full ? exitFull() : enterFull());
   const activeRef = useRef(active);
@@ -1089,12 +1093,13 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       // 按住空格：临时拖动；按住 ⌥ / Alt（画笔、填充时）：临时取色。松开回到原来的工具，不放下浮着的内容
       if (e.key === ' ' || e.key === 'Alt') {
         if (e.key === ' ') e.preventDefault();
-        if (e.repeat || tempTool.current) return;
+        if (e.repeat) return;
+        if (tempTool.current && toolRef.current === tempTool.current.to) return; // 还按着：不重复换
         const now = toolRef.current;
         const to: Tool | null = e.key === ' ' ? (now !== 'pan' ? 'pan' : null) : now === 'brush' || now === 'fill' ? 'picker' : null;
         if (!to) return;
         if (e.key === 'Alt') e.preventDefault();
-        tempTool.current = { key: e.key, back: now };
+        tempTool.current = { key: e.key, back: now, to };
         setToolRaw(to);
         return;
       }
@@ -1121,7 +1126,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       const t = tempTool.current;
       if (!t || (e && e.key !== t.key)) return;
       tempTool.current = null;
-      setToolRaw(t.back);
+      if (toolRef.current === t.to) setToolRaw(t.back); // 中途已经换了别的工具（点工具栏、按字母键）就不再换回
     };
     const onBlur = () => endTemp();
     window.addEventListener('keydown', onKey);
@@ -1675,12 +1680,18 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
           {ICON.adjust}
           <span>调整</span>
         </button>
-        {(tool === 'brush' || tool === 'fill') && (
-          <button className="rail-color" onClick={() => setPicker({ mode: 'brush' })} title="换一种颜色">
-            <i style={{ background: colorOf(color).hex }} />
-            <span>{color}</span>
-          </button>
-        )}
+        {/* 颜色按钮一直占着位置：只在画笔、填充时才出现的话，手机上整排工具会跟着挪，点到别的工具上（像是卡在填充切不走） */}
+        <button
+          className={`rail-color ${tool === 'brush' || tool === 'fill' ? '' : 'idle'}`}
+          onClick={() => {
+            if (tool !== 'brush' && tool !== 'fill') setTool(lastPaintTool.current === 'fill' ? 'fill' : 'brush');
+            setPicker({ mode: 'brush' });
+          }}
+          title="换一种颜色"
+        >
+          <i style={{ background: colorOf(color).hex }} />
+          <span>{color}</span>
+        </button>
       </div>
       {outlineOpen && (
         <div className="adjust-pop" ref={outlineRef} role="group" aria-label="描边">
@@ -1737,7 +1748,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       {tool === 'text' && (
         <div className="adjust-pop text-pop" role="group" aria-label="文字">
           <p className="pop-title">文字</p>
-          <input className="text-input" value={text} maxLength={20} placeholder="输入要放上去的文字" onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void placeText(); }} autoFocus />
+          <input className="text-input" value={text} maxLength={20} placeholder="输入要放上去的文字" onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.stopPropagation(); void placeText(); } }} autoFocus />
           <label className="switch-row static">
             <span><b>字体</b></span>
             <select className="size-pick mini" value={textFont} onChange={e => setTextFont(e.target.value as TextFont)} aria-label="字体">

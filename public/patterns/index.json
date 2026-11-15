@@ -91,7 +91,8 @@
       "id": "zisiga",
       "name": "Zisiga",
       "note": "同一个 Zisiga，换发型和衣服，左右翻页像换装",
-      "cover": "zisiga-01"
+      "cover": "zisiga-01",
+      "pinned": true
     }
   ],
   "patterns": [
