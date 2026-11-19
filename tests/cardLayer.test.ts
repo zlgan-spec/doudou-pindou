@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cardFromMask, editedCard, readCardLayer, toggleCard } from '../src/core/cardLayer';
 import { commit, mirrorGrid, redo, startHistory, undo } from '../src/core/edit';
 import { parseLibrary } from '../src/ui/library';
-import { embedPattern, readPattern } from '../src/ui/pngData';
+import { embedPatternDataUrl, readPattern } from '../src/ui/pngData';
 
 const grid = { width: 3, height: 2, cells: ['E14', 'E14', 'H7', 'E14', 'H2', 'E14'] };
 const doc = () => ({ grid, mirrored: false, cardLayer: cardFromMask(['100', '001'], grid)! });
@@ -55,8 +55,9 @@ describe('卡片层', () => {
   });
   it('PNG 往返保留已移除的卡片及恢复颜色', async () => {
     const d = toggleCard(doc());
-    const png = new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1kAAAAASUVORK5CYII='), c => c.charCodeAt(0))]);
-    const back = await readPattern(await embedPattern(png, { ...d, name: 'test', size: 'small', style: 'sticker', fullBoard: false }));
+    const url = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX2sAAAAASUVORK5CYII=';
+    const asPng = (u: string) => new Blob([Uint8Array.from(atob(u.split(',')[1]), ch => ch.charCodeAt(0))], { type: 'image/png' });
+    const back = await readPattern(asPng(embedPatternDataUrl(url, { ...d, name: 'test', size: 'small', style: 'sticker', fullBoard: false })));
     expect(back!.cardLayer!.removed).toBe(true);
     const restored = toggleCard(back!);
     expect(restored.grid.cells.filter(Boolean)).toEqual(grid.cells);
