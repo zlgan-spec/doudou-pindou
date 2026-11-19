@@ -9,7 +9,7 @@ import { MIN_BEADS_PER_COLOR, SIZES, boardArea, fitSide, type SizeId, type Style
 import { capColors, mergeRareColors } from './cleanup';
 import { connectedRegions, createGrid, type Grid } from './grid';
 import type { Mask, RgbaImage } from './image';
-import { PALETTE, colorOf, matchDistance, type BeadColor } from './palette';
+import { PALETTE, colorOf, matchDistance, nearest } from './palette';
 
 export interface PhotoInput {
   image: RgbaImage;
@@ -117,15 +117,6 @@ function cellMeans(input: PhotoInput, cols: number, rows: number, box: { x0: num
     }
   }
   return out;
-}
-
-function nearestBead(lab: Lab, candidates: readonly BeadColor[]): BeadColor {
-  let best = candidates[0], bd = Infinity;
-  for (const c of candidates) {
-    const d = matchDistance(lab, c.lab);
-    if (d < bd) [best, bd] = [c, d];
-  }
-  return best;
 }
 
 // 收色时锁住的显眼色：近黑、近白（眼睛、高光）占到 0.1%，很艳的颜色（嘴唇、红围巾）占到 0.5%，就不并掉；最多锁上限的三分之一
@@ -250,7 +241,7 @@ function smoothCells(codes: (string | null)[], cols: number, rows: number, means
     if (d === undefined) pair.set(k, (d = matchDistance(colorOf(a).lab, colorOf(b).lab)));
     return d;
   };
-  const nearestAllowed = means.map(m => (m ? nearestBead(m, allowed).code : null));
+  const nearestAllowed = means.map(m => (m ? nearest(m, allowed).code : null));
   const cur = codes.slice();
   for (let pass = 0; pass < SMOOTH_PASSES; pass++) {
     let changed = 0;
@@ -388,7 +379,7 @@ export function generateFromPhoto(input: PhotoInput, options: PhotoOptions): Gri
     if (!lab) return null;
     const key = `${Math.round(lab[0] * 400)},${Math.round(lab[1] * 400)},${Math.round(lab[2] * 400)}`;
     let code = memo.get(key);
-    if (!code) memo.set(key, (code = nearestBead(lab, PALETTE).code));
+    if (!code) memo.set(key, (code = nearest(lab, PALETTE).code));
     return code;
   });
 
