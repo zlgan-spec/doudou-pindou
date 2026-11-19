@@ -63,7 +63,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
   const [sizing, setSizing] = useState<Sizing>(opened ? { ...DEFAULT_SIZING, mode: opened.size } : DEFAULT_SIZING);
   const [style, setStyle] = useState<StyleId>(opened?.style ?? 'sticker'); // 界面上不再让用户选，默认贴纸风；拖回的 PNG 沿用它存的风格
   const [removeBg, setRemoveBg] = useState(false); // 默认保留背景，用户勾选才抠图
-  const [history, setHistory] = useState<History<Doc> | null>(() => (opened ? startHistory({ grid: opened.grid, mirrored: opened.mirrored }) : null));
+  const [history, setHistory] = useState<History<Doc> | null>(() => (opened ? startHistory({ grid: opened.grid, mirrored: opened.mirrored, cardLayer: opened.cardLayer }) : null));
   // 像素画比所选豆板大、已缩小转换时：告诉用户原样 1:1 要多大的豆板，一点就换
   const [fitHint, setFitHint] = useState<{ cols: number; rows: number; need: SizeId | null } | null>(null);
   const [status, setStatus] = useState<string>(''); // 只放需要用户知道的一句话，生成成功本身不用说
@@ -135,7 +135,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     const doc = history.present;
     const save = () => {
       pendingDraft.current = null;
-      saveDraft({ name: docName.trim() || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, ...(libRef ? { ref: libRef.name } : {}) });
+      saveDraft({ name: docName.trim() || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, cardLayer: doc.cardLayer, ...(libRef ? { ref: libRef.name } : {}) });
     };
     pendingDraft.current = save;
     const timer = window.setTimeout(save, 800);
@@ -167,7 +167,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     setFullBoard(d.fullBoard);
     setDocName(d.name === '未命名' ? '' : d.name);
     setPatternId(null);
-    setHistory(startHistory({ grid: d.grid, mirrored: d.mirrored }));
+    setHistory(startHistory({ grid: d.grid, mirrored: d.mirrored, cardLayer: d.cardLayer }));
     setLibRef(d.ref ? { name: d.ref, grid: d.grid } : null);
     setGenId(n => n + 1);
     setDraftOffer(null);
@@ -180,7 +180,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
     const save = () => {
       pendingStore.current = null;
       // 尺寸、占满整板也跟着存：收藏后换豆板重新生成，收藏里是新的这份
-      const ok = updatePattern(patternId, { grid: doc.grid, mirrored: doc.mirrored, name: docName.trim() || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', fullBoard });
+      const ok = updatePattern(patternId, { grid: doc.grid, mirrored: doc.mirrored, name: docName.trim() || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', fullBoard, cardLayer: doc.cardLayer });
       setError(ok ? '' : platform.copy.storageFull('刚才的修改没存进收藏'));
     };
     pendingStore.current = save;
@@ -371,7 +371,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
       setDocName(saved.name);
       setPatternId(null);
       setLibRef(null); // 拖回来的图纸 PNG 不带原图
-      setHistory(startHistory({ grid: saved.grid, mirrored: saved.mirrored }));
+      setHistory(startHistory({ grid: saved.grid, mirrored: saved.mirrored, cardLayer: saved.cardLayer }));
       setGenId(n => n + 1);
       setBusy(false);
       setProgress('');
@@ -473,7 +473,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
   const addToStore = (nameNow: string) => {
     if (!history) return;
     const doc = history.present;
-    const id = createPattern({ name: nameNow || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, tags: opened?.tags, libId: opened?.libId, ...(libRef ? { ref: libRef.name } : {}) });
+    const id = createPattern({ name: nameNow || '未命名', size: boardFor(doc.grid.width, doc.grid.height) ?? 'large', style, fullBoard, mirrored: doc.mirrored, grid: doc.grid, cardLayer: doc.cardLayer, tags: opened?.tags, libId: opened?.libId, ...(libRef ? { ref: libRef.name } : {}) });
     if (!id) setError(platform.copy.storageFull('收藏不进去'));
     setPatternId(id);
   };

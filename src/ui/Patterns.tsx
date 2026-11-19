@@ -20,7 +20,7 @@ interface Props {
 function toEntry(p: LibraryPattern): PatternEntry {
   const size = sizeOf(p.grid);
   return {
-    id: '', name: p.name, size: size ?? 'small', style: 'sticker', fullBoard: !size, mirrored: p.mirrored, grid: p.grid,
+    id: '', name: p.name, size: size ?? 'small', style: 'sticker', fullBoard: !size, mirrored: p.mirrored, grid: p.grid, cardLayer: p.cardLayer,
     thumb: '', tags: p.tags, libId: p.id, ...(p.ref ? { ref: p.ref } : {}), createdAt: 0, updatedAt: 0,
   };
 }
@@ -54,7 +54,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
   const items = useMemo((): BrowserItem[] => {
     const all = patterns ?? [];
     const one = (p: LibraryPattern): BrowserItem => ({
-      id: p.id, name: p.name, tags: p.tags, grid: p.grid, mirrored: p.mirrored, thumb: libraryThumb(p.id, p.grid), // 卡片只画有豆子的部分，图更大、细节看得清
+      id: p.id, name: p.name, tags: p.tags, grid: p.grid, cardLayer: p.cardLayer, mirrored: p.mirrored, thumb: libraryThumb(p.id, p.grid), // 卡片只画有豆子的部分，图更大、细节看得清
       credit: p.author || p.source ? (
         <>
           {[p.author, p.source].filter(Boolean).join(' · ')}
@@ -121,7 +121,7 @@ function Library({ onOpen }: { onOpen: Props['onOpen'] }) {
       return;
     }
     const e = toEntry(sized(p));
-    setNote(createPattern({ name: e.name, size: e.size, style: e.style, fullBoard: e.fullBoard, mirrored: e.mirrored, grid: e.grid, tags: e.tags, libId: e.libId, ...(e.ref ? { ref: e.ref } : {}) }) ? '' : platform.copy.storageFull('收藏不进去'));
+    setNote(createPattern({ name: e.name, size: e.size, style: e.style, fullBoard: e.fullBoard, mirrored: e.mirrored, grid: e.grid, cardLayer: e.cardLayer, tags: e.tags, libId: e.libId, ...(e.ref ? { ref: e.ref } : {}) }) ? '' : platform.copy.storageFull('收藏不进去'));
   };
 
   return (

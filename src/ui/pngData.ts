@@ -1,5 +1,6 @@
 // 导出的图纸 PNG 里顺带存一份格子表格（PNG 的 tEXt 文本块，看图软件会忽略它），
 // 以后把这张 PNG 拖回来就能还原成可编辑的图纸，不用另存工程文件。
+import { readCardLayer, type CardLayer } from '../core/cardLayer';
 import type { SizeId, StyleId } from '../core/config';
 import type { Grid } from '../core/grid';
 import { MAX_CUSTOM_SIDE, SIZES, STYLES, boardArea } from '../core/config';
@@ -12,6 +13,7 @@ export interface PatternData {
   fullBoard: boolean;
   mirrored: boolean;
   grid: Grid;
+  cardLayer?: CardLayer;
 }
 
 const KEYWORD = 'bead-pattern';
@@ -162,5 +164,7 @@ export function validatePatternData(d: unknown): PatternData | null {
   const size = (Object.keys(SIZES) as SizeId[]).find(s => s === o.size) ?? 'small';
   const style = (Object.keys(STYLES) as StyleId[]).find(s => s === o.style) ?? 'sticker';
   const name = typeof o.name === 'string' ? cleanName(o.name) || '未命名' : '未命名';
-  return { name, size, style, fullBoard: o.fullBoard === true, mirrored: o.mirrored === true, grid: fromOldBoard({ width, height, cells: g.cells as (string | null)[] }) };
+  const card = readCardLayer(o.cardLayer, { width, height, cells: g.cells as (string | null)[] });
+  const cardLayer = card ? { ...card, grid: fromOldBoard(card.grid) } : undefined;
+  return { ...(cardLayer ? { cardLayer } : {}), name, size, style, fullBoard: o.fullBoard === true, mirrored: o.mirrored === true, grid: fromOldBoard({ width, height, cells: g.cells as (string | null)[] }) };
 }

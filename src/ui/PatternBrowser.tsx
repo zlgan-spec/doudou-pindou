@@ -1,5 +1,6 @@
 // 图纸库和我的收藏共用的浏览方式（照着色卡库）：搜索框 + 一排标签 + 缩略图网格，点图放大看整张图纸，旁边一键下载。
 // 图纸库：顶上一排按系列筛；「全部」里同一个系列的图纸放在一起、每个系列另起一行，卡片只放图。
+import type { CardLayer } from '../core/cardLayer';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ScrollBar } from './ScrollBar';
 import { SIZES, boardLabel, type SizeId, type StyleId } from '../core/config';
@@ -15,6 +16,7 @@ export interface BrowserItem {
   name: string;
   tags: string[];
   grid: Grid;
+  cardLayer?: CardLayer;
   mirrored: boolean;
   thumb: string;
   /** 作者 · 出处，图纸库才有 */
@@ -43,7 +45,7 @@ function sizeLabel(grid: Grid): string | null {
 }
 
 /** 保存整张图纸（网站版下载、小工具版存相册），PNG 里带着格子表格，拿回做豆图能接着改 */
-export function downloadSheet(p: { name: string; grid: Grid; mirrored: boolean; size?: SizeId; style?: StyleId; fullBoard?: boolean }): Promise<void> {
+export function downloadSheet(p: { name: string; grid: Grid; mirrored: boolean; size?: SizeId; style?: StyleId; fullBoard?: boolean; cardLayer?: CardLayer }): Promise<void> {
   return platform.exportSheet({
     title: p.name,
     fileName: sheetFileName(p.name, p.mirrored),
@@ -51,7 +53,7 @@ export function downloadSheet(p: { name: string; grid: Grid; mirrored: boolean; 
       name: sheetFileName(p.name, p.mirrored),
       url: embedPatternDataUrl(
         renderSheet(p.grid, { mirrored: p.mirrored, scale: platform.exportScale(p.grid), title: p.name, codes }).toDataURL('image/png'),
-        { name: p.name, size: p.size ?? sizeOf(p.grid) ?? 'small', style: p.style ?? 'sticker', fullBoard: p.fullBoard ?? false, mirrored: p.mirrored, grid: p.grid },
+        { name: p.name, size: p.size ?? sizeOf(p.grid) ?? 'small', style: p.style ?? 'sticker', fullBoard: p.fullBoard ?? false, mirrored: p.mirrored, grid: p.grid, cardLayer: p.cardLayer },
       ),
     }],
   });

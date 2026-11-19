@@ -1,3 +1,4 @@
+import { editedCard, toggleCard, type CardLayer } from '../core/cardLayer';
 // 图纸查看与编辑：拖动 / 选区 / 画笔 / 取色 / 橡皮 / 填充 / 文字，镜像、降噪，撤销重做，色卡替换和删色，导入导出。
 // 所有操作都只改格子表格，图纸每次从表格重新画，色卡和颗数自然同步。
 import { platform } from '@platform';
@@ -37,6 +38,7 @@ export interface Reference {
 }
 
 export interface Doc {
+  cardLayer?: CardLayer;
   grid: Grid;
   mirrored: boolean;
 }
@@ -155,7 +157,7 @@ interface Props {
   name?: string;
   /** 「导入」：换一张图，或导入存过的图纸 PNG */
   onImport?: () => void;
-  /** 移除背景开关：有原图时才有（会重新生成） */
+  /** 上传图片的抠图开关；卡片层由文档独立处理，不重新生成 */
   removeBg?: boolean;
   onToggleRemoveBg?: () => void;
   busy?: boolean;
@@ -627,7 +629,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
 
   const apply = useCallback((grid: Grid, mirrored = doc.mirrored) => {
     if (grid === doc.grid && mirrored === doc.mirrored) return;
-    onHistory(commit(history, { grid, mirrored }));
+    onHistory(commit(history, { ...doc, grid, mirrored, cardLayer: editedCard(doc.cardLayer, doc.grid, grid, mirrored, doc.mirrored) }));
   }, [doc, history, onHistory]);
 
   // 屏幕坐标 → 图纸版式坐标（和画布实际像素无关，画布清晰度变了也不影响点哪格）
@@ -1146,7 +1148,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
   // 超过一块 104 板：一张总览（能导回来接着改）+ 每块板一张（只画这块板，色号和颗数也只算这块），拼一块看一张
   const buildImages = (codes: boolean): ExportImage[] => {
     const { grid, mirrored } = doc;
-    const data = { name: name.trim() || '未命名', size: board, style, fullBoard, mirrored, grid };
+    const data = { name: name.trim() || '未命名', size: board, style, fullBoard, mirrored, grid, ...(doc.cardLayer ? { cardLayer: doc.cardLayer } : {}) };
     const fileName = sheetFileName(name, mirrored);
     if (boardFor(grid.width, grid.height)) {
       const url = renderSheet(grid, { mirrored, scale: platform.exportScale(grid), title: name, codes }).toDataURL('image/png');
@@ -1461,7 +1463,7 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
     onToggleStar?.(n.trim());
   };
 
-  const adjustOn = (removeBg ? 1 : 0) + (showRef && reference ? 1 : 0) + (doc.mirrored ? 1 : 0) + (denoised ? 1 : 0);
+  const adjustOn = ((doc.cardLayer?.removed || removeBg) ? 1 : 0) + (showRef && reference ? 1 : 0) + (doc.mirrored ? 1 : 0) + (denoised ? 1 : 0);
   // 工具栏提示：鼠标在按钮上停 0.35 秒才出来，划过去不打扰
   // 有选区或浮层时，页面滚动要重新算选区弹条该放上面还是下面（吸顶导航会挡住）
   const [, setScrollTick] = useState(0);
@@ -1723,9 +1725,9 @@ export function Editor({ history, onHistory, style, fullBoard, starred = false, 
       )}
       {adjustOpen && (
         <div className="adjust-pop" ref={adjustRef} role="group" aria-label="图片调整">
-          {onToggleRemoveBg && removeBg !== undefined && (
-            <button className="switch-row" role="switch" aria-checked={removeBg} onClick={onToggleRemoveBg} disabled={busy} title="会重新生成图纸">
-              <span><b>移除背景</b><small>{platform.copy.removeBgHint}</small></span>
+          {(doc.cardLayer || (onToggleRemoveBg && removeBg !== undefined)) && (
+            <button className="switch-row" role="switch" aria-checked={doc.cardLayer ? doc.cardLayer.removed : removeBg} onClick={doc.cardLayer ? () => onHistory(commit(history, toggleCard(doc))) : onToggleRemoveBg} disabled={busy} title={doc.cardLayer ? undefined : "会重新生成图纸"}>
+              <span><b>移除背景</b>{!doc.cardLayer && <small>{platform.copy.removeBgHint}</small>}</span>
               <i aria-hidden />
             </button>
           )}

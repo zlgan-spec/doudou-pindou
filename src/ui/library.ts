@@ -3,6 +3,7 @@
 // 标签只能从 tags.json 的固定词表里选，避免「猫」「猫咪」「小猫」各一个；尺寸标签按豆板自动给。
 // 尺寸规则：读进来时把图案居中放到能装下它的最小豆板（52 / 78 / 104）上，超过 104×104 的不收。
 // 系列：文件顶部的 series 清单写系列名、说明、封面，清单顺序就是显示顺序；每张图纸用 series 字段写它属于哪个系列。
+import { cardFromMask, type CardLayer } from '../core/cardLayer';
 import { SIZES, boardFor, type SizeId } from '../core/config';
 import { contentBounds, placeOnBoard, type Grid } from '../core/grid';
 import { isValidCode } from '../core/palette';
@@ -58,6 +59,7 @@ export interface LibraryPattern {
   addedAt: string;
   mirrored: boolean;
   grid: Grid;
+  cardLayer?: CardLayer;
   /** 属于哪个系列（系列 id），不属于写 null */
   series: string | null;
   /** 这是哪一张图纸的另一个尺寸（那张的 id）。图纸库里不单独出卡片，在那张的大图里切换；不是就写 null */
@@ -133,8 +135,19 @@ function decode(o: Record<string, unknown>): LibraryPattern | null {
       cells.push(colors[i] as string);
     }
   }
-  const grid = toBoard({ width, height, cells });
+  const rawGrid = { width, height, cells };
+  const card = cardFromMask(o.cardMask, rawGrid, o.mirrored === true);
+  const grid = toBoard(rawGrid);
   if (!grid) return null;
+  let cardLayer: CardLayer | undefined;
+  const bounds = card && contentBounds(rawGrid);
+  if (card && bounds) {
+    const ox = Math.floor((grid.width - (bounds.right - bounds.left + 1)) / 2) - bounds.left;
+    const oy = Math.floor((grid.height - (bounds.bottom - bounds.top + 1)) / 2) - bounds.top;
+    const layer = new Array<string | null>(grid.cells.length).fill(null);
+    card.grid.cells.forEach((c, i) => { if (c) layer[(Math.floor(i / width) + oy) * grid.width + i % width + ox] = c; });
+    cardLayer = { ...card, grid: { ...grid, cells: layer } };
+  }
   const link = text(o.link, 300);
   return {
     id,
@@ -146,6 +159,7 @@ function decode(o: Record<string, unknown>): LibraryPattern | null {
     addedAt: text(o.addedAt, 10),
     mirrored: o.mirrored === true,
     grid,
+    ...(cardLayer ? { cardLayer } : {}),
     series: ID.test(text(o.series, 40)) ? text(o.series, 40) : null,
     variantOf: ID.test(text(o.variantOf, 40)) ? text(o.variantOf, 40) : null,
     ref: cleanRef(o.ref) ?? null,

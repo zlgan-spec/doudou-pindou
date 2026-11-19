@@ -1,6 +1,7 @@
 // 我的收藏：用户点了「收藏」的图纸，存在当前浏览器的 localStorage 里。
 // 存的是格子表格（几十 KB），打开能继续编辑；收藏之后的编辑自动跟着存。可以导出 / 导入 JSON 备份。
 import { platform } from '@platform';
+import type { CardLayer } from '../core/cardLayer';
 import type { SizeId, StyleId } from '../core/config';
 import type { Grid } from '../core/grid';
 import { colorOf } from '../core/palette';
@@ -15,6 +16,7 @@ export interface PatternEntry {
   fullBoard: boolean;
   mirrored: boolean;
   grid: Grid;
+  cardLayer?: CardLayer;
   thumb: string; // 小缩略图 data URL，列表里用
   tags?: string[]; // 从图纸库收藏的带着图纸库的标签；自己做的没有
   libId?: string; // 从图纸库收藏的：对应图纸库里的 id，用来显示「已收藏」
@@ -69,6 +71,7 @@ function toEntry(e: unknown): PatternEntry | null {
     fullBoard: data.fullBoard,
     mirrored: data.mirrored,
     grid: data.grid,
+    ...(data.cardLayer ? { cardLayer: data.cardLayer } : {}),
     thumb: typeof o.thumb === 'string' && o.thumb.startsWith('data:image/png;base64,') ? o.thumb : '',
     tags: cleanTags(o.tags),
     libId: typeof o.libId === 'string' && /^[\w-]{1,40}$/.test(o.libId) ? o.libId : undefined,
@@ -156,7 +159,7 @@ export async function importPatterns(file: File): Promise<{ added: number; updat
   const valid = [...byId.values()];
   if (!valid.length) throw new Error('文件里没有图纸');
   const before = read();
-  const content = (e: PatternEntry) => JSON.stringify([e.name, e.size, e.style, e.fullBoard, e.mirrored, e.grid, e.tags ?? [], e.libId ?? '', e.ref ?? '']);
+  const content = (e: PatternEntry) => JSON.stringify([e.name, e.size, e.style, e.fullBoard, e.mirrored, e.grid, e.tags ?? [], e.libId ?? '', e.ref ?? '', e.cardLayer ?? null]);
   let added = 0, updated = 0;
   for (const v of valid) {
     const old = before.find(e => e.id === v.id);
