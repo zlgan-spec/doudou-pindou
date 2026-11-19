@@ -106,3 +106,15 @@ it('图纸尺寸包含主图和变体，用于尺寸筛选和关键词搜索', (
   expect(patternSizeLabels({ grid: grid(104), sizes: [{ grid: grid(52) }, { grid: grid(104) }] })).toEqual(['52×52', '104×104']);
   expect(patternSizeLabels({ grid: grid(78) })).toEqual(['78×78']);
 });
+
+describe('公开图纸库', () => {
+  it('每一条都读得进来，卡片标记都有效', async () => {
+    const { readFileSync } = await import('node:fs');
+    const raw = JSON.parse(readFileSync('public/patterns/index.json', 'utf8')) as { patterns: { id: string; cardMask?: string[] }[]; series: unknown[] };
+    const lib = parseLibrary(raw);
+    expect(lib.patterns.length).toBe(raw.patterns.length);
+    expect(lib.series.length).toBe(raw.series.length);
+    const marked = raw.patterns.filter(p => p.cardMask).map(p => p.id);
+    expect(lib.patterns.filter(p => p.cardLayer).map(p => p.id)).toEqual(marked);
+  });
+});
