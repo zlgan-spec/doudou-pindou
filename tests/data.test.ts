@@ -1,6 +1,6 @@
 // 外部数据校验：图纸 PNG、收藏、备份文件读进来的数据不合格就整份丢掉，不能让页面崩或卡死
 import { describe, expect, it } from 'vitest';
-import { sheetFileName, validatePatternData } from '../src/ui/pngData';
+import { embedPatternDataUrl, readPattern, sheetFileName, validatePatternData } from '../src/ui/pngData';
 
 const ok = { name: '猫', size: 'small', style: 'sticker', grid: { width: 2, height: 1, cells: ['H7', null] } };
 
@@ -54,4 +54,22 @@ describe('下载文件名', () => {
   it('去掉文件名里不能用的字符', () => {
     expect(sheetFileName('a/b:c*?', false, d)).toBe('DouDou_abc_20261015.png');
   });
+});
+
+it('导出的 PNG 可以读回中文名、镜像状态和每一格，包括最外圈', async () => {
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX2sAAAAASUVORK5CYII=';
+  const cells: (string | null)[] = new Array(52 * 52).fill(null);
+  cells[0] = 'H7';
+  cells[cells.length - 1] = 'A1';
+  const data = {
+    name: '猫咪图纸',
+    size: 'small',
+    style: 'sticker',
+    fullBoard: true,
+    mirrored: true,
+    grid: { width: 52, height: 52, cells },
+  } as const;
+  const asPng = (url: string) => new Blob([Uint8Array.from(atob(url.split(',')[1]), ch => ch.charCodeAt(0))], { type: 'image/png' });
+  expect(await readPattern(asPng(png))).toBeNull();
+  expect(await readPattern(asPng(embedPatternDataUrl(png, data)))).toEqual(data);
 });

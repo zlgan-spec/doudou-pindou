@@ -52,23 +52,7 @@ function fromBase64(b64: string): string {
   return new TextDecoder().decode(Uint8Array.from(bin, ch => ch.charCodeAt(0)));
 }
 
-/** 在 IEND 前插入一个 tEXt 块 */
-export async function embedPattern(png: Blob, data: PatternData): Promise<Blob> {
-  const bytes = new Uint8Array(await png.arrayBuffer());
-  if (!isPng(bytes)) return png;
-  const payload = new TextEncoder().encode(`${KEYWORD}\0${toBase64(JSON.stringify({ v: 1, ...data }))}`);
-  const type = new TextEncoder().encode('tEXt');
-  const chunk = new Uint8Array(12 + payload.length);
-  const view = new DataView(chunk.buffer);
-  view.setUint32(0, payload.length);
-  chunk.set(type, 4);
-  chunk.set(payload, 8);
-  view.setUint32(8 + payload.length, crc32(chunk.subarray(4, 8 + payload.length)));
-  const iend = bytes.length - 12; // IEND 块固定 12 字节，在文件末尾
-  return new Blob([bytes.subarray(0, iend), chunk, bytes.subarray(iend)], { type: 'image/png' });
-}
-
-/** 同步版：直接改 canvas.toDataURL 得到的 PNG data URL（存相册要在点击里立刻调接口，不能等异步） */
+/** 在 canvas.toDataURL 得到的 PNG 末尾插入图纸数据；小红书存相册要求同步返回。 */
 export function embedPatternDataUrl(dataUrl: string, data: PatternData): string {
   const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
   const bin = atob(b64);
