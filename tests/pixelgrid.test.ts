@@ -90,11 +90,11 @@ describe('像素画网格识别', () => {
     }
   });
 
-  it('识别放大 7 倍、偏移 3 像素的精灵图，并还原成 16×16', () => {
-    const img = upscale(sprite(), 7, 3);
+  it.each([5, 7])('识别放大 %i 倍、偏移 3 像素的精灵图，并保留眼睛', pitch => {
+    const img = upscale(sprite(), pitch, 3);
     const grid = detectPixelGrid(img);
     expect(grid).not.toBeNull();
-    expect(Math.abs(grid!.pitch - 7)).toBeLessThan(0.3);
+    expect(Math.abs(grid!.pitch - pitch)).toBeLessThan(0.3);
     const small = resampleOnGrid(img, grid!);
     expect(small.width).toBeGreaterThanOrEqual(16);
     // 眼睛位置（第 6 行第 4 列，偏移后可能多出 1 列）应是近黑

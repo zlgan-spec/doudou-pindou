@@ -2,7 +2,7 @@
 // 做法：把主体缩到固定分辨率，按颜色聚类后找连通色块（花瓣、发丝、眼睛各是一块），
 // 然后对小 / 中 / 大三种格数各做一次模拟缩格，看有多少块还能留下来；留下 85% 以上的最小尺寸就是推荐。
 import { labDistance, rgbToLab, type Lab } from './color';
-import { SIZES, type SizeId } from './config';
+import { SIZES, boardFor, type SizeId } from './config';
 import type { Mask, RgbaImage } from './image';
 import type { InputKind } from './classify';
 
@@ -16,7 +16,7 @@ const MIN_PHOTO_RECALL = 0.9;   // 照片没有清晰色块，色块存活率总
 const SIZE_ORDER: SizeId[] = ['small', 'medium', 'large'];
 
 export function smallestSizeFor(cells: number): SizeId {
-  return SIZE_ORDER.find(id => SIZES[id].maxSubject >= cells) ?? 'large';
+  return boardFor(cells, cells) ?? 'large';
 }
 
 export interface Recommendation {

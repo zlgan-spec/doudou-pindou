@@ -570,7 +570,7 @@ function generateFromPixelArt(input: PatternInput, options: PatternOptions): Gri
   const { image, mask } = input;
   const b = maskBounds(mask, image.width, image.height);
   const bw = b.x1 - b.x0, bh = b.y1 - b.y0;
-  const boxW = options.fit?.w ?? size.maxSubject, boxH = options.fit?.h ?? size.maxSubject;
+  const boxW = options.fit?.w ?? size.board, boxH = options.fit?.h ?? size.board;
   const factor = Math.max(1, Math.ceil(bw / boxW), Math.ceil(bh / boxH));
   const gw = Math.ceil(bw / factor), gh = Math.ceil(bh / factor);
   // 色彩归一：JPEG 会把一块平涂色打散成几十种相近色。先把所有主体像素按颜色聚成几类，再把每一类配到色号。

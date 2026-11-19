@@ -10,6 +10,7 @@ import { contentBounds, createGrid, legendOf, placeOnBoard, type Grid } from '..
 import { cleanMask, dominantBorderMask, plainBackgroundMask, type RgbaImage } from '../src/core/image';
 import { chroma } from '../src/core/color';
 import { PALETTE, colorOf, isValidCode, nearest } from '../src/core/palette';
+import { recommendSize } from '../src/core/recommend';
 import { generatePattern } from '../src/core/pipeline';
 import { allPassed, validateGrid } from '../src/core/validate';
 
@@ -461,6 +462,22 @@ function pixelImage(rows: string[], colors: Record<string, [number, number, numb
   return { width, height, data };
 }
 const pixelPattern = (image: RgbaImage) => generatePattern({ image, mask: null, pixelArt: true }, { size: 'small', style: 'sticker' });
+
+it.each(['small', 'medium', 'large'] as const)('固定 %s 豆板：刚好装下的原生像素画保留 1:1', size => {
+  const side = SIZES[size].board;
+  const rows = Array.from({ length: side }, (_, y) =>
+    Array.from({ length: side }, (_, x) =>
+      x === 0 || x === side - 1 || y === 0 || y === side - 1 ? 'o' :
+      y >= 4 && y <= 5 && (x === 4 || x === side - 5) ? 'o' : 's').join(''));
+  const image = pixelImage(rows, { s: [253, 220, 198], o: [20, 20, 20] });
+  expect(recommendSize(image, null, 'pixel', { cols: side, rows: side }).size).toBe(size);
+  const grid = generatePattern({ image, mask: null, pixelArt: true }, { size, style: 'sticker' });
+  expect(grid.width).toBe(side);
+  expect(grid.height).toBe(side);
+  const dark = grid.cells[0];
+  expect(dark).not.toBeNull();
+  expect(grid.cells.map(code => code === dark)).toEqual(rows.flatMap(row => [...row].map(ch => ch === 'o')));
+});
 
 describe('像素画找色号', () => {
   it('灰蓝配成深蓝，不配成深灰；真正的灰还是灰', () => {

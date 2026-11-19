@@ -235,13 +235,12 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
         : sz.mode === 'auto' && pa ? { w: Math.min(pa.cols, MAX_CUSTOM_SIDE), h: Math.min(pa.rows, MAX_CUSTOM_SIDE) }
         : undefined;
       // 像素画的格数比豆板能放的还多：不再对半缩（细节会丢一半），改用原图按普通图缩到豆板放得下，并提示换大一号能 1:1
-      const limit = fit ?? (sz.mode !== 'auto' && sz.mode !== 'custom' ? { w: SIZES[sz.mode].maxSubject, h: SIZES[sz.mode].maxSubject } : null);
+      const limit = fit ?? (sz.mode !== 'auto' && sz.mode !== 'custom' ? { w: SIZES[sz.mode].board, h: SIZES[sz.mode].board } : null);
       const tooBig = !!pa && !!limit && (pa.cols > limit.w || pa.rows > limit.h);
       const image = tooBig ? src.original : src.image;
       const pixelArt = !!src.pixelArt && !tooBig;
       if (tooBig && pa) {
-        const longSide = Math.max(pa.cols, pa.rows);
-        const need = (Object.keys(SIZES) as SizeId[]).find(s => SIZES[s].maxSubject >= longSide) ?? null;
+        const need = boardFor(pa.cols, pa.rows);
         setFitHint({ cols: pa.cols, rows: pa.rows, need });
       } else {
         setFitHint(null);
@@ -287,9 +286,10 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
         setError('这张图里没有可以拼的内容，换一张试试');
         return;
       }
-      const full = kind === 'photo' && !mask;
       setHistory(startHistory({ grid, mirrored: false }));
       const box = contentBounds(grid);
+      const full = (kind === 'photo' && !mask) || (kind === 'pixel' && !!box &&
+        Math.max(box.right - box.left + 1, box.bottom - box.top + 1) > SIZES[sizeId].maxSubject);
       setReference(box ? { url: src.previewUrl, crop: subjectCrop(image, mask), box } : null);
       setFullBoard(full);
       setGenId(n => n + 1);
@@ -298,7 +298,7 @@ export function Generator({ opened, incoming = null, active = true }: Props) {
         setDocName(''); // 文件名常常是一串乱码，不拿来当名字；用户在顶栏或收藏时再起
         setPatternId(null); // 新图片生成的图纸还没收藏
       }
-      const b = contentBounds(grid);
+      const b = box;
       const longSide = b ? Math.max(b.right - b.left, b.bottom - b.top) + 1 : 0;
       const shortSide = b ? Math.min(b.right - b.left, b.bottom - b.top) + 1 : 0;
       if (shortSide && longSide / shortSide > 2 && !fit && sizeId !== 'large') {
