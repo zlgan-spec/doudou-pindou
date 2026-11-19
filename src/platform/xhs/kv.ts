@@ -17,6 +17,7 @@ interface XhsWindow { xhs?: { miniTool?: MiniTool; launchOptions?: { miniToolEnv
 
 const memory = new Map<string, string>();
 let platform: MiniTool | null = null;
+let onWriteError: ((key: string) => void) | undefined;
 
 function miniTool(): MiniTool | null {
   const xhs = (window as unknown as XhsWindow).xhs;
@@ -80,7 +81,7 @@ async function writePlatform(mt: MiniTool, key: string, value: string | null): P
     for (let i = 0; i < n; i++) await mt.setStorage!({ key: `${key}#${i}`, data: JSON.stringify(value.slice(i * CHUNK, (i + 1) * CHUNK)) });
     await mt.setStorage!({ key: `${key}#n`, data: JSON.stringify(String(n)) });
   } catch {
-    /* 存不下就算了：内存里还有，这次打开期间照常用 */
+    onWriteError?.(key);
   }
 }
 
@@ -92,7 +93,7 @@ function persist(key: string, value: string | null): void {
     try {
       if (value == null) localStorage.removeItem(key);
       else localStorage.setItem(key, value);
-    } catch { /* 存不下就算了 */ }
+    } catch { onWriteError?.(key); }
     return;
   }
   const prev = queues.get(key) || Promise.resolve();
@@ -100,7 +101,8 @@ function persist(key: string, value: string | null): void {
 }
 
 /** 启动时调一次，读完再渲染页面 */
-export async function initStorage(): Promise<void> {
+export async function initStorage(reportWriteError?: (key: string) => void): Promise<void> {
+  onWriteError = reportWriteError;
   const mt = miniTool();
   if (mt && typeof mt.setStorage === 'function' && typeof mt.getStorage === 'function' && typeof mt.removeStorage === 'function'
     && Math.floor((await buildVersion()) / 1000) >= MIN_CLIENT) {

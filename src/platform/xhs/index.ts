@@ -7,7 +7,7 @@ import { generatePattern, generateRich, type PatternInput, type PatternOptions }
 import { sheetLayout } from '../../render/sheet';
 import type { Platform } from '../types';
 import libraryData from 'virtual:library-data';
-import { onAlbumNote } from './album';
+import { onAlbumNote, showNote } from './album';
 import { markFlexGap } from './compat';
 import { copy } from './copy';
 import { ExportHost, openExport } from './ExportSheet';
@@ -36,7 +36,11 @@ export const platform: Platform = {
   copy,
   async boot() {
     // initSpread 要在 initStorage 之后（读「提过关注没有」）；它只查版本，不等网络
-    await Promise.all([initStorage().then(initSpread), initSafeArea()]);
+    const storageReady = initStorage(key => {
+      if (key === 'bead-patterns-v1') showNote('收藏变更未保存。请先留在当前页面，存相册备份图纸。');
+      if (key === 'bead-draft') showNote('草稿未保存。请先留在当前页面，存相册备份图纸。');
+    });
+    await Promise.all([storageReady.then(initSpread), initSafeArea()]);
     markFlexGap();
     applyTheme();
   },

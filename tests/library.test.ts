@@ -1,6 +1,6 @@
 // 图纸库的系列：读取时的检查和分组
 import { describe, expect, it } from 'vitest';
-import { groupSeries, parseLibrary } from '../src/ui/library';
+import { groupSeries, parseLibrary, patternSizeLabels } from '../src/ui/library';
 
 const pattern = (id: string, series?: string) => ({ id, name: id, tags: [], colors: ['A1'], rows: ['00', '00'], ...(series ? { series } : {}) });
 const cats = { id: 'golden-cat', name: '金渐层', note: '同一只猫的一组动作', cover: 'cat-2' };
@@ -99,4 +99,10 @@ describe('筛选：大类、标签、尺寸', () => {
     expect(f.subs).toEqual([{ name: '猫咪', n: 2 }, { name: '挂画', n: 1 }]);
     expect(f.sizes).toEqual([{ name: '52×52', n: 5 }, { name: '78×78', n: 1 }]);
   });
+});
+
+it('图纸尺寸包含主图和变体，用于尺寸筛选和关键词搜索', () => {
+  const grid = (side: number) => ({ width: side, height: side, cells: [] });
+  expect(patternSizeLabels({ grid: grid(104), sizes: [{ grid: grid(52) }, { grid: grid(104) }] })).toEqual(['52×52', '104×104']);
+  expect(patternSizeLabels({ grid: grid(78) })).toEqual(['78×78']);
 });

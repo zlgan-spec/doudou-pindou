@@ -6,7 +6,7 @@ import { ScrollBar } from './ScrollBar';
 import { SIZES, boardLabel, type SizeId, type StyleId } from '../core/config';
 import { beadCount, legendOf, type Grid } from '../core/grid';
 import { renderSheet, sheetLayout } from '../render/sheet';
-import { DETAIL_TAGS, buildFilters, nameInSeries, primaryCategory, sizeOf } from './library';
+import { DETAIL_TAGS, buildFilters, nameInSeries, patternSizeLabels, primaryCategory, sizeOf } from './library';
 import { platform } from '@platform';
 import { setToastHost } from './NoteToast';
 import { embedPatternDataUrl, sheetFileName } from './pngData';
@@ -164,8 +164,9 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
     const s = seriesOf.get(i.id) ?? '';
     if (cat && (q || !openFolder) && primaryCategory(i.tags) !== cat) return false;
     if (subOn && !i.tags.includes(subOn)) return false;
-    if (size && !(i.sizes ?? [i]).some(v => sizeLabel(v.grid) === size)) return false;
-    return !q || i.name.toLowerCase().includes(q) || [...i.tags, sizeLabel(i.grid) ?? '', s].some(t => t && t.toLowerCase().includes(q));
+    const sizes = patternSizeLabels(i);
+    if (size && !sizes.includes(size)) return false;
+    return !q || i.name.toLowerCase().includes(q) || [...i.tags, ...sizes, s].some(t => t && t.toLowerCase().includes(q));
   }), [ordered, openFolder, q, cat, subOn, size, seriesOf]);
   const blocks = useMemo(() => [list], [list]);
 
@@ -258,13 +259,13 @@ export function PatternBrowser({ items, actions, series = [], blocks: allBlocks 
       ) : null}
 
       {wall ? null : !list.length ? (
-        <p className="color-hint">没有找到{query.trim() ? `「${query.trim()}」` : '这一类的图纸'}，换个{query.trim() ? '名字' : '筛选'}试试</p>
+        <p className="color-hint">{q && (size || cat || subOn) ? '当前筛选无结果，试试其他筛选或关键词' : <>没有找到{query.trim() ? `「${query.trim()}」` : '这一类的图纸'}，换个{query.trim() ? '名字' : '筛选'}试试</>}</p>
       ) : (
-        // 图纸库的卡片比色卡大一些、只放图（用户主要看图），打开文件夹时下面加名字；我的收藏和色卡库同一套卡片
+        // 图纸库打开文件夹或搜索时，卡片上显示名字；我的收藏和色卡库同一套卡片
         <div className="pattern-blocks">
           {blocks.map((b, bi) => (
             <ul key={bi} className={`color-grid ${library ? 'pattern-grid' : ''}`}>
-              {b.map(item => <Card key={item.id} item={item} i={n++} bare={library} label={openFolder && !q ? nameInSeries(item.name, openFolder.name) : undefined} onOpen={setActiveId} />)}
+              {b.map(item => <Card key={item.id} item={item} i={n++} bare={library} label={openFolder && !q ? nameInSeries(item.name, openFolder.name) : q ? nameInSeries(item.name, seriesOf.get(item.id) ?? '') : undefined} onOpen={setActiveId} />)}
             </ul>
           ))}
         </div>

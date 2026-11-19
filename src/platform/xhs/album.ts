@@ -18,7 +18,7 @@ export function onAlbumNote(fn: (note: AlbumNote) => void): () => void {
   listeners.add(fn);
   return () => { listeners.delete(fn); };
 }
-function note(text: string, actions?: NoteAction[]): void {
+export function showNote(text: string, actions?: NoteAction[]): void {
   listeners.forEach(fn => fn({ text, actions }));
 }
 
@@ -42,7 +42,7 @@ export function albumAvailable(): boolean {
 export function saveDataUrls(urls: string[]): Promise<number> {
   const mt = miniTool();
   if (!mt || typeof mt.writeTempFile !== 'function' || typeof mt.saveImageToPhotosAlbum !== 'function') {
-    note('请在小红书 App 里打开，才能保存到相册');
+    showNote('请在小红书 App 里打开，才能保存到相册');
     return Promise.resolve(0);
   }
   const write = mt.writeTempFile.bind(mt);
@@ -62,10 +62,10 @@ export function saveDataUrls(urls: string[]): Promise<number> {
     }
   }), Promise.resolve());
   return run.then(() => {
-    if (saved === urls.length) note(urls.length > 1 ? `已保存 ${saved} 张到相册` : '已保存到相册', afterSaveActions(urls, note));
-    else if (/auth|权限|deny|denied/i.test(failure)) note('没有相册权限：请在手机设置里允许小红书访问相册后再试');
-    else if (saved) note(`保存了 ${saved} 张，还有 ${urls.length - saved} 张没存进相册（${failure}）`);
-    else note(`没能保存到相册（${failure}）`);
+    if (saved === urls.length) showNote(urls.length > 1 ? `已保存 ${saved} 张到相册` : '已保存到相册', afterSaveActions(urls, showNote));
+    else if (/auth|权限|deny|denied/i.test(failure)) showNote('没有相册权限：请在手机设置里允许小红书访问相册后再试');
+    else if (saved) showNote(`保存了 ${saved} 张，还有 ${urls.length - saved} 张没存进相册（${failure}）`);
+    else showNote(`没能保存到相册（${failure}）`);
     return saved;
   });
 }

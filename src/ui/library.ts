@@ -98,6 +98,13 @@ export function cleanTags(tags: unknown): string[] {
 }
 
 /** 图纸放在哪块豆板上：按颗数算（图纸库、收藏的图纸都已经是整块豆板）；超过 104 返回 null */
+export function patternSizeLabels(item: { grid: Grid; sizes?: readonly { grid: Grid }[] }): string[] {
+  return (item.sizes ?? [item]).flatMap(({ grid }) => {
+    const size = sizeOf(grid);
+    return size ? [SIZES[size].label] : [];
+  });
+}
+
 export function sizeOf(grid: Grid): SizeId | null {
   return boardFor(grid.width, grid.height);
 }
